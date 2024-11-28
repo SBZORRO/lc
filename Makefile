@@ -1,7 +1,5 @@
 all: libvector.so libvector.a
 
-#test.c: *.h
-
 %.o: %.c
 	$(CC) -c $<
 
