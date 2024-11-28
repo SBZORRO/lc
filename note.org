@@ -1,0 +1,8 @@
+* so
+int i = 0;
+int fun() {}
+
+* main
+int foo();
+int i;
+extern int j;
