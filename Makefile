@@ -1,4 +1,4 @@
-all: libvector.so libvector.a hello
+all: libvector.so libvector.a hello main
 
 %.o: %.c
 	$(CC) -c $<
@@ -11,6 +11,12 @@ libvector.a: addvec.o multvec.o
 
 libvector.so: addvec.c multvec.c
 	$(CC) -shared -fpic -o $@ $^
+
+sum.so: sum.c
+	$(CC) -shared -fpic -o $@ $^
+
+main: main.c sum.so
+	$(CC) -o $@ $< ./sum.so
 
 clean:
 	rm *.o *.a *.so hello

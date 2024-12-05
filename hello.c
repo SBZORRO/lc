@@ -2,7 +2,7 @@
 
 int main(int argc, char *argv[])
 {
-  getchar;
+  getchar();
   char name[2];
   printf("Input your name: ");
   scanf("%s", name);
