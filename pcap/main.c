@@ -1,23 +1,33 @@
-#include <pcap.h>
+#include <endian.h>
 #include <pcap/pcap.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include "packet.h"
 
+int loop ();
 char *get_if ();
-void dl_ethernet (u_char *user, const struct pcap_pkthdr *h,
-		  const u_char *p);
+void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
+
 int
 main (int argc, char *argv[])
 {
-  char errbuf[PCAP_ERRBUF_SIZE];
-  struct bpf_program fp; /* The compiled filter expression */
-  char filter_exp[] = "port 9998"; /* The filter expression */
-  bpf_u_int32 mask; /* The netmask of our sniffing device */
-  bpf_u_int32 net;  /* The IP of our sniffing device */
-  pcap_t *pt;
-  struct pcap_pkthdr header; /* The header that pcap gives us */
-  const u_char *packet;	     /* The actual packet */
+  loop ();
+}
+
+int
+loop ()
+{
+  struct bpf_program fp;               /* The compiled filter expression */
+  char filter_exp[] = "dst port 9998"; /* The filter expression */
+  bpf_u_int32 mask;                    /* The netmask of our sniffing device */
+  bpf_u_int32 net;                     /* The IP of our sniffing device */
+  struct pcap_pkthdr header;           /* The header that pcap gives us */
+  const u_char *packet;                /* The actual packet */
 
   pcap_handler handler = dl_ethernet;
+
+  pcap_t *pt;
+  char errbuf[PCAP_ERRBUF_SIZE];
 
   pt = pcap_open_live (get_if (), BUFSIZ, 1, 1000, errbuf);
   if (pt == NULL)
@@ -28,17 +38,15 @@ main (int argc, char *argv[])
   if (pcap_compile (pt, &fp, filter_exp, 0, net) == -1)
     {
       fprintf (stderr, "Couldn't parse filter %s: %s\n", filter_exp,
-	       pcap_geterr (pt));
+               pcap_geterr (pt));
       return (2);
     }
   if (pcap_setfilter (pt, &fp) == -1)
     {
       fprintf (stderr, "Couldn't install filter %s: %s\n", filter_exp,
-	       pcap_geterr (pt));
+               pcap_geterr (pt));
       return (2);
     }
-  /* packet = pcap_next (pt, &header); */
-  /* printf ("packet: %s\n", packet); */
 
   pcap_loop (pt, -1, handler, NULL);
   return (0);
@@ -48,37 +56,56 @@ char *
 get_if ()
 {
   char buf[PCAP_ERRBUF_SIZE];
-  pcap_if_t *pit[100];
+  pcap_if_t *pit[1];
   int res = pcap_findalldevs (pit, buf);
   printf ("pit: %s\n", (pit[0])->name);
   return (pit[0])->name;
 }
 
 void
-dl_ethernet (u_char *user, const struct pcap_pkthdr *h,
-	     const u_char *p)
+dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
 {
-  for (int i = 0; i < h->len; ++i)
+  static int count = 1; /* packet counter */
+
+  const struct sniff_ethernet *ethernet; /* The ethernet header */
+  const struct sniff_ip *ip;             /* The IP header */
+  const struct sniff_tcp *tcp;           /* The TCP header */
+  const u_char *payload;                 /* Packet payload */
+
+  u_int size_ip;
+  u_int size_tcp;
+  u_int size_payload;
+
+  ethernet = (struct sniff_ethernet *) (p);
+  ip = (struct sniff_ip *) (p + SIZE_ETHERNET);
+  size_ip = IP_HL (ip) * 4;
+  if (size_ip < 20)
     {
-      printf ("packet%d: %d\n", i, p[i]);
+      printf ("   * Invalid IP header length: %u bytes\n", size_ip);
+      return;
     }
-    /* u_int caplen = h->caplen; */
-    /* u_int length = h->len; */
-    /* struct ether_header *eth_header = (struct ether_header *) p; */
 
-    /* if (length != caplen) { */
-    /* } */
+  /* print source and destination IP addresses */
+  printf ("       From: %s\n", inet_ntoa (ip->ip_src));
+  printf ("         To: %s\n", inet_ntoa (ip->ip_dst));
 
-    /* if (caplen < sizeof(struct ether_header)) { */
-    /*   return; */
-    /* } */
+  tcp = (struct sniff_tcp *) (p + SIZE_ETHERNET + size_ip);
+  size_tcp = TH_OFF (tcp) * 4;
+  if (size_tcp < 20)
+    {
+      printf ("   * Invalid TCP header length: %u bytes\n", size_tcp);
+      return;
+    }
+  printf ("   Src port: %d\n", ntohs (tcp->th_sport));
+  printf ("   Dst port: %d\n", ntohs (tcp->th_dport));
 
-    /* /\* we're only expecting IP datagrams, nothing else *\/ */
-    /* if (ntohs(eth_header->ether_type) != ETHERTYPE_IP) { */
-    /*   ntohs(eth_header->ether_type)); */
-    /*   return; */
-    /* } */
+  size_payload = ntohs (ip->ip_len) - (size_ip + size_tcp);
+  payload = (u_char *) (p + SIZE_ETHERNET + size_ip + size_tcp);
 
-    /* process_ip(p + sizeof(struct ether_header), */
-    /*      caplen - sizeof(struct ether_header)) */;
+  printf ("%u--%u", htobe32 (tcp->th_seq), htobe32 (tcp->th_ack));
+  for (int i = 0; i < size_payload; ++i)
+    {
+      printf ("%c", payload[i]);
+    }
+  printf ("\n");
 }
