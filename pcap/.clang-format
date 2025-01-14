@@ -33,7 +33,7 @@ MaxEmptyLinesToKeep: 1
 PenaltyBreakBeforeFirstCallParameter: 2000
 SpaceAfterCStyleCast: true
 SpaceBeforeParens: Always
-UseTab: Always
+UseTab: Never
 ---
 Language: Cpp
 ---
