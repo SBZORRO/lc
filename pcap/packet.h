@@ -64,3 +64,37 @@ struct sniff_tcp
   u_short th_sum; /* checksum */
   u_short th_urp; /* urgent pointer */
 };
+
+typedef struct flow_state_struct flow_state_t;
+typedef struct flow_struct flow_t;
+
+struct flow_struct
+{
+  flow_state_t *next; /* Link to next one */
+  u_int nxt;
+  u_int isn;
+  u_int32_t src;   /* Source IP address */
+  u_int32_t dst;   /* Destination IP address */
+  u_int16_t sport; /* Source port number */
+  u_int16_t dport; /* Destination port number */
+};
+
+struct flow_state_struct
+{
+  flow_state_t *next; /* Link to next one */
+  flow_t flow;        /* Description of this flow */
+  // tcp_seq isn;                    /* Initial sequence number we've seen */
+  u_int len;
+  u_char *payload;
+  //  FILE *fp;			/* Pointer to file storing this flow's data */
+  //  long pos; /* Current write position in fp */
+  //  int flags;			/* Don't save any more data from this
+  //  flow */ int last_access;		/* "Time" of last access */
+};
+
+#define HASH_SIZE 0
+#define MALLOC(type, num) (type *) check_malloc ((num) * sizeof (type))
+#define HASH_FLOW(flow)                                      \
+  (((flow.sport & 0xff) | ((flow.dport & 0xff) << 8)         \
+    | ((flow.src & 0xff) << 16) | ((flow.dst & 0xff) << 24)) \
+   % HASH_SIZE)
