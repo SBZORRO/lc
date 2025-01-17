@@ -84,6 +84,7 @@ struct flow_state_struct
   flow_state_t *next; /* Link to next one */
   flow_t flow;        /* Description of this flow */
   // tcp_seq isn;                    /* Initial sequence number we've seen */
+  u_int seq;
   u_int len;
   u_char *payload;
   //  FILE *fp;			/* Pointer to file storing this flow's data */
@@ -93,7 +94,6 @@ struct flow_state_struct
 };
 
 #define HASH_SIZE 0
-#define MALLOC(type, num) (type *) check_malloc ((num) * sizeof (type))
 #define HASH_FLOW(flow)                                      \
   (((flow.sport & 0xff) | ((flow.dport & 0xff) << 8)         \
     | ((flow.src & 0xff) << 16) | ((flow.dst & 0xff) << 24)) \

@@ -2,13 +2,14 @@
 #include <pcap/pcap.h>
 #include <stdatomic.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include "client.h"
 #include "packet.h"
+
+void print_flow_state (flow_t *flow);
 
 int loop ();
 char *get_if ();
@@ -29,7 +30,7 @@ main (int argc, char *argv[])
   /* flow.dst; */
   /* flow.sport; */
   /* flow.dport; */
-  /* do_connect (); */
+  do_connect ();
   loop ();
 }
 
@@ -112,6 +113,8 @@ get_if ()
   return (pit[0])->name;
 }
 
+#define MALLOC(type, num) (type *) check_malloc ((num) * sizeof (type))
+
 /* Simple wrapper around the malloc() function */
 void *
 check_malloc (size_t size)
@@ -134,31 +137,44 @@ check_malloc (size_t size)
  *
  * Returns a pointer to the new state. */
 flow_state_t *
-create_flow_state (flow_t flow, tcp_seq isn, u_int size_payload,
+create_flow_state (flow_t *flow, tcp_seq seq, u_int size_payload,
                    const u_char *payload)
 {
   flow_state_t *new_flow_state = MALLOC (flow_state_t, 1);
-
-  flow_state_t *ptr = flow.next;
-  while (ptr != NULL)
-    {
-      ptr = ptr->next;
-    }
-  ptr = new_flow_state;
-
-  new_flow_state->flow = flow;
+  new_flow_state->next = NULL;
+  new_flow_state->flow = *flow;
+  new_flow_state->seq = seq;
   new_flow_state->len = size_payload;
   new_flow_state->payload = MALLOC (u_char, size_payload);
   memcpy (new_flow_state->payload, payload, size_payload);
 
+  flow_state_t **ptr = &(flow->next);
+  while (*ptr != NULL)
+    {
+      /* dup packet use new */
+      if (seq == (*ptr)->seq)
+        {
+          new_flow_state->next = (*ptr)->next;
+          *ptr = &(*new_flow_state);
+          return new_flow_state;
+        }
+      /* retrans packet */
+      if (seq < (*ptr)->seq)
+        {
+          new_flow_state->next = *ptr;
+          *ptr = &(*new_flow_state);
+          return new_flow_state;
+        }
+      ptr = &((*ptr)->next);
+    }
+
+  *ptr = &(*new_flow_state);
   return new_flow_state;
 }
 
 void
 dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
 {
-  static int count = 1; /* packet counter */
-
   const struct sniff_ethernet *ethernet; /* The ethernet header */
   const struct sniff_ip *ip;             /* The IP header */
   const struct sniff_tcp *tcp;           /* The TCP header */
@@ -194,36 +210,58 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
   size_payload = ntohs (ip->ip_len) - (size_ip + size_tcp);
   payload = (u_char *) (p + SIZE_ETHERNET + size_ip + size_tcp);
 
-  uint32_t seq = ntohl (tcp->th_seq);
-  uint32_t ack = ntohl (tcp->th_ack);
-
-  flow_state_t *state;
-  /* see if we have state about this flow; if not, create it */
+  u_int seq = ntohl (tcp->th_seq);
+  u_int ack = ntohl (tcp->th_ack);
 
   if (flow.isn == 0 && flow.nxt == 0)
     {
       flow.isn = seq;
       flow.nxt = seq;
     }
-
+  /* create_flow_state (&flow, seq, size_payload, payload); */
   if (flow.nxt == seq)
     {
       do_sent ((char *) payload, (size_t) size_payload);
+      flow.nxt += size_payload;
+      flow_state_t *state = flow.next;
+      while (state != NULL && flow.nxt == state->seq)
+        {
+          do_sent ((char *) state->payload, (size_t) state->len);
+          flow.nxt += state->len;
+          state = state->next;
+        }
+      flow.next = state;
     }
   else
     {
-      create_flow_state (flow, seq, size_payload, payload);
+      create_flow_state (&flow, seq, size_payload, payload);
     }
 
-  printf ("%u--%u\n", flow.nxt, seq);
-  flow.nxt = seq + size_payload;
-
-  printf ("%u--%u\n", seq, ack);
+  printf ("%u--%u--%u\n", flow.nxt, seq, ack);
   for (int i = 0; i < size_payload; ++i)
     {
       printf ("%c", payload[i]);
     }
   printf ("\n");
 
-  do_sent ((char *) payload, (size_t) size_payload);
+  print_flow_state (&flow);
+  /* do_sent ((char *) payload, (size_t) size_payload); */
+}
+
+void
+print_flow_state (flow_t *flow)
+{
+  flow_state_t *ptr = flow->next;
+  printf ("---------------------------------------------------\n");
+  while (ptr != NULL)
+    {
+      printf ("%u\n", ptr->seq);
+      for (int i = 0; i < ptr->len; ++i)
+        {
+          printf ("%c", ptr->payload[i]);
+        }
+      printf ("\n");
+      printf ("---------------------------------------------------\n");
+      ptr = ptr->next;
+    }
 }
