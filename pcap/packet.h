@@ -73,8 +73,9 @@ struct flow_struct
   flow_state_t *next; /* Link to next one */
   u_int nxt;
   u_int isn;
-  u_int32_t src;   /* Source IP address */
-  u_int32_t dst;   /* Destination IP address */
+  struct in_addr ip_src, ip_dst; /* source and dest address */
+  /* u_int32_t src;   /\* Source IP address *\/ */
+  /* u_int32_t dst;   /\* Destination IP address *\/ */
   u_int16_t sport; /* Source port number */
   u_int16_t dport; /* Destination port number */
 };

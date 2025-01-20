@@ -1,38 +1,12 @@
-#include <endian.h>
-#include <pcap/pcap.h>
-#include <stdatomic.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include "client.h"
-#include "packet.h"
-
-void print_flow_state (flow_t *flow);
+#include "captotcp.h"
 
 int loop ();
 char *get_if ();
 void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
 
 char filter_exp[] = "dst port 9998"; /* The filter expression */
-
-flow_t flow;
-flow_state_t *flow_hash[0];
-
-int
-main (int argc, char *argv[])
-{
-  flow.next = NULL;
-  flow.nxt = 0;
-  flow.isn = 0;
-  /* flow.src; */
-  /* flow.dst; */
-  /* flow.sport; */
-  /* flow.dport; */
-  do_connect ();
-  loop ();
-}
+flow_t *flow_ptr;
 
 int
 loop ()
@@ -113,65 +87,6 @@ get_if ()
   return (pit[0])->name;
 }
 
-#define MALLOC(type, num) (type *) check_malloc ((num) * sizeof (type))
-
-/* Simple wrapper around the malloc() function */
-void *
-check_malloc (size_t size)
-{
-  void *ptr;
-
-  if ((ptr = malloc (size)) == NULL)
-    {
-      /* DEBUG(0) ("Malloc failed - out of memory?"); */
-      exit (1);
-    }
-  return ptr;
-}
-
-/* Create a new flow state structure, initialize its contents, and add
- * it to its hash bucket.  It is prepended to the hash bucket because
- * 1) doing so is fast (requiring constant time regardless of bucket
- * size; and 2) it'll tend to make lookups faster for more recently
- * added state, which will probably be more often used state.
- *
- * Returns a pointer to the new state. */
-flow_state_t *
-create_flow_state (flow_t *flow, tcp_seq seq, u_int size_payload,
-                   const u_char *payload)
-{
-  flow_state_t *new_flow_state = MALLOC (flow_state_t, 1);
-  new_flow_state->next = NULL;
-  new_flow_state->flow = *flow;
-  new_flow_state->seq = seq;
-  new_flow_state->len = size_payload;
-  new_flow_state->payload = MALLOC (u_char, size_payload);
-  memcpy (new_flow_state->payload, payload, size_payload);
-
-  flow_state_t **ptr = &(flow->next);
-  while (*ptr != NULL)
-    {
-      /* dup packet use new */
-      if (seq == (*ptr)->seq)
-        {
-          new_flow_state->next = (*ptr)->next;
-          *ptr = &(*new_flow_state);
-          return new_flow_state;
-        }
-      /* retrans packet */
-      if (seq < (*ptr)->seq)
-        {
-          new_flow_state->next = *ptr;
-          *ptr = &(*new_flow_state);
-          return new_flow_state;
-        }
-      ptr = &((*ptr)->next);
-    }
-
-  *ptr = &(*new_flow_state);
-  return new_flow_state;
-}
-
 void
 dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
 {
@@ -193,10 +108,6 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
       return;
     }
 
-  /* print source and destination IP addresses */
-  printf ("       From: %s\n", inet_ntoa (ip->ip_src));
-  printf ("         To: %s\n", inet_ntoa (ip->ip_dst));
-
   tcp = (struct sniff_tcp *) (p + SIZE_ETHERNET + size_ip);
   size_tcp = TH_OFF (tcp) * 4;
   if (size_tcp < 20)
@@ -204,8 +115,6 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
       printf ("   * Invalid TCP header length: %u bytes\n", size_tcp);
       return;
     }
-  printf ("   Src port: %d\n", ntohs (tcp->th_sport));
-  printf ("   Dst port: %d\n", ntohs (tcp->th_dport));
 
   size_payload = ntohs (ip->ip_len) - (size_ip + size_tcp);
   payload = (u_char *) (p + SIZE_ETHERNET + size_ip + size_tcp);
@@ -213,6 +122,7 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
   u_int seq = ntohl (tcp->th_seq);
   u_int ack = ntohl (tcp->th_ack);
 
+  flow_t flow = find_flow (flow_ptr);
   if (flow.isn == 0 && flow.nxt == 0)
     {
       flow.isn = seq;
@@ -228,7 +138,9 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
         {
           do_sent ((char *) state->payload, (size_t) state->len);
           flow.nxt += state->len;
+          flow_state_t *tbf = state;
           state = state->next;
+          free_flow_state (tbf);
         }
       flow.next = state;
     }
@@ -248,20 +160,34 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
   /* do_sent ((char *) payload, (size_t) size_payload); */
 }
 
-void
-print_flow_state (flow_t *flow)
+u_int16_t
+atos (char *c)
 {
-  flow_state_t *ptr = flow->next;
-  printf ("---------------------------------------------------\n");
-  while (ptr != NULL)
+  u_int16_t port = 0;
+  while (*c != '\0')
     {
-      printf ("%u\n", ptr->seq);
-      for (int i = 0; i < ptr->len; ++i)
-        {
-          printf ("%c", ptr->payload[i]);
-        }
-      printf ("\n");
-      printf ("---------------------------------------------------\n");
-      ptr = ptr->next;
+      port = port * 10 + (*c - 48);
+      c = c + 1;
     }
+  return htons (port);
+}
+
+int
+main (int argc, char *argv[])
+{
+  flow_ptr = MALLOC (flow_t, argc);
+  for (int i = 1, j = 0; i < argc; i++, j++)
+    {
+      char *addr = argv[i];
+      char *ip = strtok (addr, ":");
+      char *port = strtok (NULL, "\0");
+      inet_aton (ip, &flow_ptr[j].ip_src);
+      flow_ptr[j].sport = atos (port);
+      flow_ptr[j].next = NULL;
+      flow_ptr[j].nxt = 0;
+      flow_ptr[j].isn = 0;
+    }
+  flow_t flow = flow_ptr[0];
+  do_connect ();
+  loop ();
 }
