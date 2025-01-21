@@ -2,7 +2,6 @@
 #include <string.h>
 #include "captotcp.h"
 
-
 flow_state_t *flow_hash[0];
 
 void *
@@ -24,7 +23,7 @@ create_flow_state (flow_t *flow, tcp_seq seq, u_int size_payload,
 {
   flow_state_t *new_flow_state = MALLOC (flow_state_t, 1);
   new_flow_state->next = NULL;
-  new_flow_state->flow = *flow;
+  new_flow_state->flow = flow;
   new_flow_state->seq = seq;
   new_flow_state->len = size_payload;
   new_flow_state->payload = MALLOC (u_char, size_payload);
@@ -84,7 +83,16 @@ free_flow_state (flow_state_t *fs)
 }
 
 flow_t
-find_flow (flow_t* flow)
+find_flow (flow_t *flow, int len, const struct sniff_ip *ip,
+           const struct sniff_tcp *tcp)
 {
+  for (int i = 0; i < len; i++)
+    {
+      if (flow[i].ip_src.s_addr == ip->ip_src.s_addr
+          && flow[i].sport == tcp->th_sport)
+        {
+          return flow[i];
+        }
+    }
   return flow[0];
 }

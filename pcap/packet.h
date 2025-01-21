@@ -83,7 +83,7 @@ struct flow_struct
 struct flow_state_struct
 {
   flow_state_t *next; /* Link to next one */
-  flow_t flow;        /* Description of this flow */
+  flow_t *flow;       /* Description of this flow */
   // tcp_seq isn;                    /* Initial sequence number we've seen */
   u_int seq;
   u_int len;

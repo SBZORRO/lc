@@ -7,6 +7,7 @@ void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
 
 char filter_exp[] = "dst port 9998"; /* The filter expression */
 flow_t *flow_ptr;
+int flow_len;
 
 int
 loop ()
@@ -122,7 +123,7 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
   u_int seq = ntohl (tcp->th_seq);
   u_int ack = ntohl (tcp->th_ack);
 
-  flow_t flow = find_flow (flow_ptr);
+  flow_t flow = find_flow (flow_ptr, flow_len, ip, tcp);
   if (flow.isn == 0 && flow.nxt == 0)
     {
       flow.isn = seq;
@@ -169,25 +170,26 @@ atos (char *c)
       port = port * 10 + (*c - 48);
       c = c + 1;
     }
-  return htons (port);
+  return port;
 }
 
 int
 main (int argc, char *argv[])
 {
   flow_ptr = MALLOC (flow_t, argc);
+  flow_len = argc;
   for (int i = 1, j = 0; i < argc; i++, j++)
     {
       char *addr = argv[i];
       char *ip = strtok (addr, ":");
       char *port = strtok (NULL, "\0");
       inet_aton (ip, &flow_ptr[j].ip_src);
-      flow_ptr[j].sport = atos (port);
+      flow_ptr[j].sport = htons (atos (port));
       flow_ptr[j].next = NULL;
       flow_ptr[j].nxt = 0;
       flow_ptr[j].isn = 0;
     }
-  flow_t flow = flow_ptr[0];
-  do_connect ();
+
+  do_connect (flow_ptr[0].ip_src, flow_ptr[0].sport);
   loop ();
 }
