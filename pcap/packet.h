@@ -1,4 +1,5 @@
 #include <pcap.h>
+#include <sys/types.h>
 
 /* ethernet headers are always exactly 14 bytes */
 #define SIZE_ETHERNET 14
@@ -35,7 +36,7 @@ struct sniff_ip
 #define IP_V(ip) (((ip)->ip_vhl) >> 4)
 
 /* TCP header */
-typedef u_int tcp_seq;
+/* typedef u_int tcp_seq; */
 /* typedef union */
 /* { */
 /*   u_int seq; */
@@ -46,8 +47,8 @@ struct sniff_tcp
 {
   u_short th_sport; /* source port */
   u_short th_dport; /* destination port */
-  tcp_seq th_seq;   /* sequence number */
-  tcp_seq th_ack;   /* acknowledgement number */
+  u_int th_seq;     /* sequence number */
+  u_int th_ack;     /* acknowledgement number */
   u_char th_offx2;  /* data offset, rsvd */
 #define TH_OFF(th) (((th)->th_offx2 & 0xf0) >> 4)
   u_char th_flags;
@@ -76,8 +77,8 @@ struct flow_struct
   struct in_addr ip_src, ip_dst; /* source and dest address */
   /* u_int32_t src;   /\* Source IP address *\/ */
   /* u_int32_t dst;   /\* Destination IP address *\/ */
-  u_int16_t sport; /* Source port number */
-  u_int16_t dport; /* Destination port number */
+  u_short sport; /* Source port number */
+  u_short dport; /* Destination port number */
 };
 
 struct flow_state_struct

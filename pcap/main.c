@@ -1,4 +1,10 @@
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <netinet/in.h>
+#include <pcap/pcap.h>
+#include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
 #include "captotcp.h"
 
 int loop ();
