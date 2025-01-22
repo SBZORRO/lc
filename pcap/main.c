@@ -1,8 +1,10 @@
 #include <arpa/inet.h>
-#include <stdio.h>
+#include <bits/pthreadtypes.h>
 #include <netinet/in.h>
 #include <pcap/pcap.h>
+#include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include "captotcp.h"
@@ -10,8 +12,16 @@
 int loop ();
 char *get_if ();
 void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
+unsigned int bufsize = 1024 * 1024 * 1024;
 
-char filter_exp[] = "dst port 9998"; /* The filter expression */
+char *dst_ip;
+char *dst_port;
+u_short d_port;
+u_int d_ip;
+
+/* char filter_exp[] = "dst port 9998"; /\* The filter expression *\/ */
+char *filter_exp = "dst port 9998"; /* The filter expression */
+
 flow_t *flow_ptr;
 int flow_len;
 
@@ -27,7 +37,7 @@ loop ()
   pcap_t *pt;
   char errbuf[PCAP_ERRBUF_SIZE];
 
-  pt = pcap_open_live (get_if (), BUFSIZ, 1, 1000, errbuf);
+  pt = pcap_open_live (get_if (), bufsize, 1, 1000, errbuf);
   if (pt == NULL)
     {
       fprintf (stderr, "Could't open D %s: \n", errbuf);
@@ -167,35 +177,39 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
   /* do_sent ((char *) payload, (size_t) size_payload); */
 }
 
-u_int16_t
-atos (char *c)
-{
-  u_int16_t port = 0;
-  while (*c != '\0')
-    {
-      port = port * 10 + (*c - 48);
-      c = c + 1;
-    }
-  return port;
-}
-
 int
 main (int argc, char *argv[])
 {
-  flow_ptr = MALLOC (flow_t, argc);
-  flow_len = argc;
-  for (int i = 1, j = 0; i < argc; i++, j++)
+  /* 1: pcap-filter */
+  filter_exp = argv[1];
+
+  /* 2: dst addr */
+  char *addr = argv[2];
+  dst_ip = strtok (addr, ":");
+  dst_port = strtok (NULL, "\0");
+  d_port = htons (atoi (dst_port));
+  d_ip = inet_addr (dst_ip);
+
+  do_connect (d_ip, d_port);
+
+  /* 3-...: src addr */
+  flow_ptr = MALLOC (flow_t, argc - 3);
+  flow_len = argc - 3;
+  for (int i = 3, j = 0; i < argc; i++, j++)
     {
       char *addr = argv[i];
       char *ip = strtok (addr, ":");
       char *port = strtok (NULL, "\0");
-      inet_aton (ip, &flow_ptr[j].ip_src);
-      flow_ptr[j].sport = htons (atos (port));
+      /* inet_aton (ip, &flow_ptr[j].ip_src); */
+      flow_ptr[j].ip_src.s_addr = inet_addr (dst_ip);
+      flow_ptr[j].sport = htons (atoi (port));
       flow_ptr[j].next = NULL;
       flow_ptr[j].nxt = 0;
       flow_ptr[j].isn = 0;
     }
 
-  do_connect (flow_ptr[0].ip_src, flow_ptr[0].sport);
   loop ();
+
+  /* pthread_t pid = 1; */
+  /* pthread_create (&pid, NULL, NULL, NULL); */
 }

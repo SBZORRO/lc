@@ -1,7 +1,8 @@
+#define make_filter(ip, p) (src host ip and src port p)
 /* client */
 #include <netinet/in.h>
 void do_sent (char *msg, int len);
-int do_connect (struct in_addr sin_addr, in_port_t sin_port);
+int do_connect (u_int sin_addr, u_short sin_port);
 
 /* flow */
 #include <sys/types.h>

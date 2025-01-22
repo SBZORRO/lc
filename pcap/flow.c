@@ -22,7 +22,7 @@ check_malloc (size_t size)
 }
 
 flow_state_t *
-create_flow_state (flow_t *flow, tcp_seq seq, u_int size_payload,
+create_flow_state (flow_t *flow, u_int seq, u_int size_payload,
                    const u_char *payload)
 {
   flow_state_t *new_flow_state = MALLOC (flow_state_t, 1);

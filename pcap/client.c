@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include "captotcp.h"
 
@@ -18,7 +19,7 @@ do_sent (char *msg, int len)
       perror ("Send Fail");
       if (errno == EPIPE || errno == ECONNRESET)
         {
-          while (do_connect (serv_addr.sin_addr, serv_addr.sin_port))
+          while (do_connect (serv_addr.sin_addr.s_addr, serv_addr.sin_port))
             {
               sleep (1);
             }
@@ -27,7 +28,7 @@ do_sent (char *msg, int len)
 }
 
 int
-do_connect (struct in_addr ip, in_port_t port)
+do_connect (u_int ip, u_short port)
 {
   if ((sock = socket (AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -36,8 +37,8 @@ do_connect (struct in_addr ip, in_port_t port)
     }
 
   serv_addr.sin_family = AF_INET;
-  serv_addr.sin_port = htons (port);
-  serv_addr.sin_addr = ip;
+  serv_addr.sin_port = port;
+  serv_addr.sin_addr.s_addr = ip;
 
   // Convert address to binary form
   /* if (inet_pton (AF_INET, IP, &serv_addr.sin_addr) <= 0) */
