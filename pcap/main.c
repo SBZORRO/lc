@@ -60,40 +60,6 @@ loop ()
   return 0;
 }
 
-int
-loop_handler (pcap_handler handler)
-{
-  struct bpf_program fp; /* The compiled filter expression */
-  bpf_u_int32 mask;      /* The netmask of our sniffing device */
-  bpf_u_int32 net;       /* The IP of our sniffing device */
-
-  pcap_t *pt;
-  char errbuf[PCAP_ERRBUF_SIZE];
-
-  pt = pcap_open_live (get_if (), BUFSIZ, 1, 1000, errbuf);
-  if (pt == NULL)
-    {
-      fprintf (stderr, "Could't open D %s: \n", errbuf);
-    }
-
-  if (pcap_compile (pt, &fp, filter_exp, 0, net) == -1)
-    {
-      fprintf (stderr, "Couldn't parse filter %s: %s\n", filter_exp,
-               pcap_geterr (pt));
-      return (2);
-    }
-  if (pcap_setfilter (pt, &fp) == -1)
-    {
-      fprintf (stderr, "Couldn't install filter %s: %s\n", filter_exp,
-               pcap_geterr (pt));
-      return (2);
-    }
-
-  printf ("loop!!!\n");
-  pcap_loop (pt, -1, handler, NULL);
-  return 0;
-}
-
 char *
 get_if ()
 {
