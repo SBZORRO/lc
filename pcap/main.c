@@ -25,6 +25,18 @@ char *filter_exp = "dst port 9998"; /* The filter expression */
 flow_t *flow_ptr;
 int flow_len;
 
+void
+reset_flow (flow_t *flow)
+{
+  flow_state_t *ptr = flow->next;
+  while (ptr != NULL)
+    {
+      free_flow_state (ptr);
+      ptr = ptr->next;
+    }
+  flow->next = NULL;
+}
+
 int
 loop ()
 {
@@ -99,13 +111,19 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
       return;
     }
 
+  flow_t flow = find_flow (flow_ptr, flow_len, ip, tcp);
+  if ((tcp->th_flags & TH_SYN) || (tcp->th_flags & TH_FIN)
+      || (tcp->th_flags & TH_RST))
+    {
+      reset_flow (&flow);
+    }
+
   size_payload = ntohs (ip->ip_len) - (size_ip + size_tcp);
   payload = (u_char *) (p + SIZE_ETHERNET + size_ip + size_tcp);
 
   u_int seq = ntohl (tcp->th_seq);
   u_int ack = ntohl (tcp->th_ack);
 
-  flow_t flow = find_flow (flow_ptr, flow_len, ip, tcp);
   if (flow.isn == 0 && flow.nxt == 0)
     {
       flow.isn = seq;
