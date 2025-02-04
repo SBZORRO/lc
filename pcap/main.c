@@ -147,7 +147,7 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
     }
   else
     {
-      create_flow_state (&flow, seq, size_payload, payload);
+5      create_flow_state (&flow, seq, size_payload, payload);
     }
 
   printf ("%u--%u--%u\n", flow.nxt, seq, ack);
@@ -161,22 +161,9 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
   /* do_sent ((char *) payload, (size_t) size_payload); */
 }
 
-int
-main (int argc, char *argv[])
+void
+init_flow (int argc, char *argv[])
 {
-  /* 1: pcap-filter */
-  filter_exp = argv[1];
-
-  /* 2: dst addr */
-  char *addr = argv[2];
-  dst_ip = strtok (addr, ":");
-  dst_port = strtok (NULL, "\0");
-  d_port = htons (atoi (dst_port));
-  d_ip = inet_addr (dst_ip);
-
-  do_connect (d_ip, d_port);
-
-  /* 3-...: src addr */
   flow_ptr = MALLOC (flow_t, argc - 3);
   flow_len = argc - 3;
   for (int i = 3, j = 0; i < argc; i++, j++)
@@ -191,6 +178,50 @@ main (int argc, char *argv[])
       flow_ptr[j].nxt = 0;
       flow_ptr[j].isn = 0;
     }
+}
+
+void
+init_dst_addr (char *argv[])
+{
+  char *addr = argv[2];
+  dst_ip = strtok (addr, ":");
+  dst_port = strtok (NULL, "\0");
+  d_port = htons (atoi (dst_port));
+  d_ip = inet_addr (dst_ip);
+}
+
+int
+main (int argc, char *argv[])
+{
+  /* 1: pcap-filter */
+  filter_exp = argv[1];
+
+  /* 2: dst addr */
+  init_dst_addr (argv);
+  /* char *addr = argv[2]; */
+  /* dst_ip = strtok (addr, ":"); */
+  /* dst_port = strtok (NULL, "\0"); */
+  /* d_port = htons (atoi (dst_port)); */
+  /* d_ip = inet_addr (dst_ip); */
+
+  do_connect (d_ip, d_port);
+
+  /* 3-...: src addr */
+  init_flow (argc, argv);
+  /* flow_ptr = MALLOC (flow_t, argc - 3); */
+  /* flow_len = argc - 3; */
+  /* for (int i = 3, j = 0; i < argc; i++, j++) */
+  /*   { */
+  /*     char *addr = argv[i]; */
+  /*     char *ip = strtok (addr, ":"); */
+  /*     char *port = strtok (NULL, "\0"); */
+  /*     /\* inet_aton (ip, &flow_ptr[j].ip_src); *\/ */
+  /*     flow_ptr[j].ip_src.s_addr = inet_addr (dst_ip); */
+  /*     flow_ptr[j].sport = htons (atoi (port)); */
+  /*     flow_ptr[j].next = NULL; */
+  /*     flow_ptr[j].nxt = 0; */
+  /*     flow_ptr[j].isn = 0; */
+  /*   } */
 
   loop ();
 
