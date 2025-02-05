@@ -9,9 +9,6 @@
 #include <sys/types.h>
 #include "captotcp.h"
 
-int loop ();
-char *get_if ();
-void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
 unsigned int bufsize = 1024 * 1024 * 1024;
 
 char *dst_ip;
@@ -23,7 +20,7 @@ u_int d_ip;
 char *filter_exp = "dst port 9998"; /* The filter expression */
 
 flow_t *flow_ptr;
-int flow_len;
+int flow_len = 0;
 
 void
 reset_flow (flow_t *flow)
@@ -147,7 +144,7 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
     }
   else
     {
-5      create_flow_state (&flow, seq, size_payload, payload);
+      create_flow_state (&flow, seq, size_payload, payload);
     }
 
   printf ("%u--%u--%u\n", flow.nxt, seq, ack);
@@ -162,28 +159,37 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
 }
 
 void
-init_flow (int argc, char *argv[])
+split (char *addr, char **ip, char **port)
 {
-  flow_ptr = MALLOC (flow_t, argc - 3);
-  flow_len = argc - 3;
-  for (int i = 3, j = 0; i < argc; i++, j++)
+  char *split = strstr (addr, ":");
+  *port = split + 1;
+  *ip = (char *) malloc (split - addr - 1);
+  memcpy (ip, addr, split - addr - 1);
+  *port = (char *) malloc (strlen (*port));
+  memcpy (port, port, strlen (*port));
+}
+
+void
+init_flow (flow_t **flow, int len, char *argv[])
+{
+  *flow = MALLOC (flow_t, len);
+  for (int i = 0, j = 0; i < len; i++, j++)
     {
       char *addr = argv[i];
       char *ip = strtok (addr, ":");
       char *port = strtok (NULL, "\0");
       /* inet_aton (ip, &flow_ptr[j].ip_src); */
-      flow_ptr[j].ip_src.s_addr = inet_addr (dst_ip);
-      flow_ptr[j].sport = htons (atoi (port));
-      flow_ptr[j].next = NULL;
-      flow_ptr[j].nxt = 0;
-      flow_ptr[j].isn = 0;
+      (*flow)[j].ip_src.s_addr = inet_addr (ip);
+      (*flow)[j].sport = htons (atoi (port));
+      (*flow)[j].next = NULL;
+      (*flow)[j].nxt = 0;
+      (*flow)[j].isn = 0;
     }
 }
 
 void
-init_dst_addr (char *argv[])
+init_dst_addr (char *addr)
 {
-  char *addr = argv[2];
   dst_ip = strtok (addr, ":");
   dst_port = strtok (NULL, "\0");
   d_port = htons (atoi (dst_port));
@@ -197,17 +203,16 @@ main (int argc, char *argv[])
   filter_exp = argv[1];
 
   /* 2: dst addr */
-  init_dst_addr (argv);
+  init_dst_addr (argv[2]);
   /* char *addr = argv[2]; */
   /* dst_ip = strtok (addr, ":"); */
   /* dst_port = strtok (NULL, "\0"); */
   /* d_port = htons (atoi (dst_port)); */
   /* d_ip = inet_addr (dst_ip); */
 
-  do_connect (d_ip, d_port);
-
   /* 3-...: src addr */
-  init_flow (argc, argv);
+  flow_len = argc - 3;
+  init_flow (&flow_ptr, flow_len, argv + 3);
   /* flow_ptr = MALLOC (flow_t, argc - 3); */
   /* flow_len = argc - 3; */
   /* for (int i = 3, j = 0; i < argc; i++, j++) */
@@ -223,11 +228,13 @@ main (int argc, char *argv[])
   /*     flow_ptr[j].isn = 0; */
   /*   } */
 
+  do_connect (d_ip, d_port);
+
   loop ();
 
-  pthread_t pid = 1;
-  pthread_create (&pid, NULL, NULL, NULL);
+  /* pthread_t pid = 1; */
+  /* pthread_create (&pid, NULL, NULL, NULL); */
 
-  pthread_mutex_t pmt;
-  pthread_mutex_lock (&pmt);
+  /* pthread_mutex_t pmt; */
+  /* pthread_mutex_lock (&pmt); */
 }

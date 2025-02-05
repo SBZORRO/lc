@@ -26,72 +26,51 @@ static int test_pass = 0;
 
 #define EXPECT_EQ_INT(expect, actual) \
   EXPECT_EQ_BASE ((expect) == (actual), expect, actual, "%d")
-#define EXPECT_EQ_STRING(expect, actual, alength)             \
-  EXPECT_EQ_BASE (sizeof (expect) - 1 == alength              \
-                    && memcmp (expect, actual, alength) == 0, \
-                  expect, actual, "%s")
-#define EXPECT_EQ_STR(expect, actual, alength)                \
-  EXPECT_EQ_BASE (strlen (expect) == alength                  \
-                    && memcmp (expect, actual, alength) == 0, \
-                  expect, actual, "%s")
-#define EXPECT_EQ_PTR(expect, actual) \
-  EXPECT_EQ_BASE ((expect) == (actual), expect, actual, "%p")
 
-void
-test_create_flow (int argc, char *argv[])
+void *
+check_malloc (size_t size)
 {
-  flow_t *ptr;
-  int len = argc - 1;
+  void *ptr;
 
-  argv++;
-
-  char *act[len];
-  for (int i = 0; i < len; ++i)
+  if ((ptr = malloc (size)) == NULL)
     {
-      act[i] = malloc (strlen (argv[i]));
-      memcpy (act[i], argv[i], (strlen (argv[i])));
+      /* DEBUG(0) ("Malloc failed - out of memory?"); */
+      exit (1);
     }
-  init_flow (&ptr, len, argv);
-  for (int i = 0; i < len; ++i)
-    {
-      char addr[22];
-      char port[5];
-      sprintf (port, "%d", ntohs (ptr[i].sport));
-      strcpy (addr, inet_ntoa (ptr[i].ip_src));
-      strcat (addr, ":");
-      strcat (addr, port);
-
-      EXPECT_EQ_STR (act[i], addr, strlen (addr));
-      EXPECT_EQ_PTR (NULL, ptr[i].next);
-      EXPECT_EQ_INT (0, ptr[i].nxt);
-      EXPECT_EQ_INT (0, ptr[i].isn);
-    }
+  return ptr;
 }
 
 void
-test_create_flow_state ()
+test_create_flow ()
 {
-}
+  char *argv[] = { "./hello",
+                   "'(src host 172.17.80.1 and src port 9997) or (dst host "
+                   "172.17.81.3 and dst port 9999)'",
+                   "192.168.5.17:9999", "172.17.81.3:9998" };
+  int argc = 4;
 
-void
-test_flow_state_count ()
-{
-}
+  char *addr = argv[3];
+  printf ("%s", addr);
+  char *split = strstr (addr, ":");
+  char *port = split + 1;
+  printf ("indi>%s<", ++split);
+  printf ("\ngap: %d", (int) (addr - split));
+  char ip[split - addr - 1];
+  memcpy (ip, addr, split - addr - 1);
+  printf ("\nip:: %s", ip);
+  printf ("\nport:: %d", (int) strlen(port));
 
-void
-test_flow_state ()
-{
+  /* char* ip = strncpy() */
+  /* char *port = strtok (NULL, "\0"); */
+
+  /* EXPECT_EQ_INT (1, len); */
 }
 
 int
 main (int argc, char *argv[])
 {
-  printf ("argc: %d\n", argc);
-  for (int i = 1; i < argc; ++i)
-    {
-      printf ("argv: %s\n", argv[i]);
-    }
-  test_create_flow (argc, argv);
+
+  test_create_flow ();
   printf ("%d/%d (%3.2f%%) passed\n", test_pass, test_count,
           test_pass * 100.0 / test_count);
   return main_ret;

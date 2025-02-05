@@ -1,3 +1,4 @@
+#include <netinet/in.h>
 #include <pcap.h>
 #include <sys/types.h>
 

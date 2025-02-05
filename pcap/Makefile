@@ -1,4 +1,4 @@
-all: 
+all: hello
 
 %.o: %.c
 	$(CC) -c $<
@@ -7,6 +7,9 @@ convar: convar.c
 	$(CC) -o $@ $^
 
 hello: main.c client.c flow.c
+	$(CC) -o $@ $^ -I. -lpcap
+
+test: test.c main.c client.c flow.c
 	$(CC) -o $@ $^ -I. -lpcap
 
 hello.so: main.c
