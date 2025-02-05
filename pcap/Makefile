@@ -3,6 +3,9 @@ all:
 %.o: %.c
 	$(CC) -c $<
 
+convar: convar.c
+	$(CC) -o $@ $^
+
 hello: main.c client.c flow.c
 	$(CC) -o $@ $^ -I. -lpcap
 

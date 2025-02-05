@@ -225,6 +225,9 @@ main (int argc, char *argv[])
 
   loop ();
 
-  /* pthread_t pid = 1; */
-  /* pthread_create (&pid, NULL, NULL, NULL); */
+  pthread_t pid = 1;
+  pthread_create (&pid, NULL, NULL, NULL);
+
+  pthread_mutex_t pmt;
+  pthread_mutex_lock (&pmt);
 }
