@@ -8,6 +8,39 @@
 
 flow_state_t *flow_hash[0];
 
+flow_t *flow_ptr;
+int flow_len = 0;
+
+void
+reset_flow (flow_t *flow)
+{
+  flow_state_t *ptr = flow->next;
+  while (ptr != NULL)
+    {
+      free_flow_state (ptr);
+      ptr = ptr->next;
+    }
+  flow->next = NULL;
+}
+
+void
+init_flow (flow_t **flow, int len, char *argv[])
+{
+  *flow = MALLOC (flow_t, len);
+  for (int i = 0, j = 0; i < len; i++, j++)
+    {
+      char *addr = argv[i];
+      char *ip = strtok (addr, ":");
+      char *port = strtok (NULL, "\0");
+      /* inet_aton (ip, &flow_ptr[j].ip_src); */
+      (*flow)[j].ip_src.s_addr = inet_addr (ip);
+      (*flow)[j].sport = htons (atoi (port));
+      (*flow)[j].next = NULL;
+      (*flow)[j].nxt = 0;
+      (*flow)[j].isn = 0;
+    }
+}
+
 void *
 check_malloc (size_t size)
 {

@@ -131,6 +131,7 @@ test_attach_flow_state (int argc, char *argv[])
   EXPECT_EQ_INT (0, ptr->isn);
   EXPECT_EQ_INT (0, ptr->nxt);
 
+  printf ("payload: ");
   print_flow_state (ptr);
 
   TEST_DETACH_FLOW_STATE (ptr, 123, 3, "123");
@@ -139,6 +140,7 @@ test_attach_flow_state (int argc, char *argv[])
   TEST_DETACH_FLOW_STATE (ptr, 983, 3, "123");
   TEST_DETACH_FLOW_STATE (ptr, 298346, 7, "       ");
   TEST_DETACH_FLOW_STATE (ptr, 921034, 7, "1234567");
+  printf ("payload: ");
   print_flow_state (ptr);
 }
 
