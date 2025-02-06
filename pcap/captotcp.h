@@ -17,6 +17,9 @@ void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
 
 flow_state_t *create_flow_state (flow_t *flow, u_int seq, u_int size_payload,
                                  const u_char *payload);
+flow_state_t *attach_flow_state (flow_t *flow, flow_state_t *new_flow_state);
+flow_state_t *detach_flow_state (flow_t *flow, flow_state_t *new_flow_state);
+
 void print_flow_state (flow_t *flow);
 void free_flow_state (flow_state_t *fs);
 

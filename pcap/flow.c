@@ -22,17 +22,25 @@ check_malloc (size_t size)
 }
 
 flow_state_t *
-create_flow_state (flow_t *flow, u_int seq, u_int size_payload,
-                   const u_char *payload)
+detach_flow_state (flow_t *flow, flow_state_t *state)
 {
-  flow_state_t *new_flow_state = MALLOC (flow_state_t, 1);
-  new_flow_state->next = NULL;
-  new_flow_state->flow = flow;
-  new_flow_state->seq = seq;
-  new_flow_state->len = size_payload;
-  new_flow_state->payload = MALLOC (u_char, size_payload);
-  memcpy (new_flow_state->payload, payload, size_payload);
+  /* while (state != NULL && flow->nxt == state->seq) */
+  /*   { */
+  /* do_sent ((char *) state->payload, (size_t) state->len); */
+  flow->nxt += state->len;
+  flow_state_t *tbf = state;
+  state = state->next;
+  /* free_flow_state (tbf); */
+  /* } */
+  flow->next = state;
+  return tbf;
+}
 
+flow_state_t *
+attach_flow_state (flow_t *flow, flow_state_t *new_flow_state)
+{
+  new_flow_state->flow = flow;
+  u_int seq = new_flow_state->seq;
   flow_state_t **ptr = &(flow->next);
   while (*ptr != NULL)
     {
@@ -57,15 +65,52 @@ create_flow_state (flow_t *flow, u_int seq, u_int size_payload,
   return new_flow_state;
 }
 
+flow_state_t *
+create_flow_state (flow_t *flow, u_int seq, u_int size_payload,
+                   const u_char *payload)
+{
+  flow_state_t *new_flow_state = MALLOC (flow_state_t, 1);
+  new_flow_state->next = NULL;
+  new_flow_state->flow = NULL;
+  /* new_flow_state->flow = flow; */
+  new_flow_state->seq = seq;
+  new_flow_state->len = size_payload;
+  new_flow_state->payload = MALLOC (u_char, size_payload);
+  memcpy (new_flow_state->payload, payload, size_payload);
+
+  /* flow_state_t **ptr = &(flow->next); */
+  /* while (*ptr != NULL) */
+  /*   { */
+  /*     /\* dup packet use new *\/ */
+  /*     if (seq == (*ptr)->seq) */
+  /*       { */
+  /*         new_flow_state->next = (*ptr)->next; */
+  /*         *ptr = &(*new_flow_state); */
+  /*         return new_flow_state; */
+  /*       } */
+  /*     /\* retrans packet *\/ */
+  /*     if (seq < (*ptr)->seq) */
+  /*       { */
+  /*         new_flow_state->next = *ptr; */
+  /*         *ptr = &(*new_flow_state); */
+  /*         return new_flow_state; */
+  /*       } */
+  /*     ptr = &((*ptr)->next); */
+  /*   } */
+
+  /* *ptr = &(*new_flow_state); */
+  return new_flow_state;
+}
+
 void
 print_flow_state (flow_t *flow)
 {
   /* print source and destination IP addresses */
-  printf ("       From: %s\n", inet_ntoa (flow->ip_src));
-  printf ("         To: %s\n", inet_ntoa (flow->ip_dst));
+  /* printf ("       From: %s\n", inet_ntoa (flow->ip_src)); */
+  /* printf ("         To: %s\n", inet_ntoa (flow->ip_dst)); */
 
-  printf ("   Src port: %u\n", ntohs (flow->sport));
-  printf ("   Dst port: %u\n", ntohs (flow->dport));
+  /* printf ("   Src port: %u\n", ntohs (flow->sport)); */
+  /* printf ("   Dst port: %u\n", ntohs (flow->dport)); */
 
   flow_state_t *ptr = flow->next;
   while (ptr != NULL)

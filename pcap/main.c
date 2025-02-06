@@ -131,16 +131,18 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
     {
       do_sent ((char *) payload, (size_t) size_payload);
       flow.nxt += size_payload;
+
       flow_state_t *state = flow.next;
       while (state != NULL && flow.nxt == state->seq)
         {
+          state = detach_flow_state (&flow, state);
           do_sent ((char *) state->payload, (size_t) state->len);
-          flow.nxt += state->len;
-          flow_state_t *tbf = state;
-          state = state->next;
-          free_flow_state (tbf);
+          /*     flow.nxt += state->len; */
+          /*     flow_state_t *tbf = state; */
+          /*     state = state->next; */
+          free_flow_state (state);
         }
-      flow.next = state;
+      /* flow.next = state; */
     }
   else
     {
