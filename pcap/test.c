@@ -38,18 +38,25 @@ static int test_pass = 0;
 #define EXPECT_EQ_PTR(expect, actual) \
   EXPECT_EQ_BASE ((expect) == (actual), expect, actual, "%p")
 
+#define INIT_FLOW(ptr, len, argc, argv)                 \
+  do                                                    \
+    {                                                   \
+      char *act[len];                                   \
+      for (int i = 0; i < len; ++i)                     \
+        {                                               \
+          act[i] = malloc (strlen (argv[i]));           \
+          memcpy (act[i], argv[i], (strlen (argv[i]))); \
+        }                                               \
+      init_flow (&ptr, len, act);                       \
+    }                                                   \
+  while (0)
+
 void
 test_create_flow (int argc, char *argv[])
 {
   flow_t *ptr;
   int len = argc;
-  char *act[len];
-  for (int i = 0; i < len; ++i)
-    {
-      act[i] = malloc (strlen (argv[i]));
-      memcpy (act[i], argv[i], (strlen (argv[i])));
-    }
-  init_flow (&ptr, len, act);
+  INIT_FLOW (ptr, len, argc, argv);
   for (int i = 0; i < len; ++i)
     {
       char addr[22];
@@ -113,13 +120,7 @@ test_attach_flow_state (int argc, char *argv[])
 {
   flow_t *ptr;
   int len = argc;
-  char *act[len];
-  for (int i = 0; i < len; ++i)
-    {
-      act[i] = malloc (strlen (argv[i]));
-      memcpy (act[i], argv[i], (strlen (argv[i])));
-    }
-  init_flow (&ptr, len, act);
+  INIT_FLOW (ptr, len, argc, argv);
 
   ATTACH_FLOW_STATE (ptr, 123, 3, "123");
   ATTACH_FLOW_STATE (ptr, 921034, 7, "1234567");
