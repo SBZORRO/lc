@@ -132,13 +132,12 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
       create_flow_state (&flow, seq, size_payload, payload);
     }
 
-  printf ("%u--%u--%u\n", flow.nxt, seq, ack);
+  /* printf ("%u--%u--%u\n", flow.nxt, seq, ack); */
   for (int i = 0; i < size_payload; ++i)
     {
       printf ("%c", payload[i]);
     }
-  printf ("\n");
 
-  print_flow_state (&flow);
+  /* print_flow_state (&flow); */
   /* do_sent ((char *) payload, (size_t) size_payload); */
 }
