@@ -18,5 +18,8 @@ sum.so: sum.c
 main: main.c sum.so
 	$(CC) -o $@ $< ./sum.so
 
+kilo: kilo.c
+	$(CC) -o kilo kilo.c -Wall -W -pedantic -std=c99
+
 clean:
-	rm *.o *.a *.so hello
+	rm *.o *.a *.so hello kilo
