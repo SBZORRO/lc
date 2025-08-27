@@ -3,7 +3,6 @@
 #include <netinet/in.h>
 #include <pcap/pcap.h>
 #include <pthread.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>

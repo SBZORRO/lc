@@ -1,21 +1,32 @@
+CC := gcc
+
+CFLAGS := -Wall -std=c89 -I../src
+
+SRC := ../src
+BUILD := .
+
+SRCS := $(wildcard $(SRC)/*.c)
+OBJS := $(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(SRCS))
+DEPS := $(SRC)/pcapimpl.c $(SRC)/client.c $(SRC)/flow.c
+
 all: hello
 
-%.o: %.c
+%.o: $(SRC)/%.c
 	$(CC) -c $<
 
-convar: convar.c
+convar: $(SRC)/convar.c
 	$(CC) -o $@ $^
 
-hello: main.c pcapimpl.c client.c flow.c
+hello: $(SRC)/main.c $(DEPS)
 	$(CC) -o $@ $^ -I. -lpcap
 
-test: test.c pcapimpl.c client.c flow.c
+test: $(SRC)/test.c $(DEPS)
 	$(CC) -o $@ $^ -I. -lpcap
 
-hello.so: main.c
+hello.so: $(SRC)/main.c
 	$(CC) -shared -fPIC -o $@ $< -lpcap
 
-client: client.c
+client: $(SRC)/client.c
 	$(CC) -o $@ $<
 
 clean:
