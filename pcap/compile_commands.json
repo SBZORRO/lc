@@ -1,0 +1,41 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-I.",
+      "-o",
+      "hello",
+      "main.c"
+    ],
+    "directory": "/mnt/d/git-repo/lc/pcap",
+    "file": "/mnt/d/git-repo/lc/pcap/main.c",
+    "output": "/mnt/d/git-repo/lc/pcap/hello"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-I.",
+      "-o",
+      "hello",
+      "client.c"
+    ],
+    "directory": "/mnt/d/git-repo/lc/pcap",
+    "file": "/mnt/d/git-repo/lc/pcap/client.c",
+    "output": "/mnt/d/git-repo/lc/pcap/hello"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-I.",
+      "-o",
+      "hello",
+      "flow.c"
+    ],
+    "directory": "/mnt/d/git-repo/lc/pcap",
+    "file": "/mnt/d/git-repo/lc/pcap/flow.c",
+    "output": "/mnt/d/git-repo/lc/pcap/hello"
+  }
+]

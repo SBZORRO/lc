@@ -73,8 +73,8 @@ typedef struct flow_struct flow_t;
 struct flow_struct
 {
   flow_state_t *next; /* Link to next one */
-  u_int nxt;
-  u_int isn;
+  u_int nxt; // expect byte
+  u_int isn; // init seq num
   struct in_addr ip_src, ip_dst; /* source and dest address */
   /* u_int32_t src;   /\* Source IP address *\/ */
   /* u_int32_t dst;   /\* Destination IP address *\/ */
@@ -92,8 +92,8 @@ struct flow_state_struct
   u_char *payload;
   //  FILE *fp;			/* Pointer to file storing this flow's data */
   //  long pos; /* Current write position in fp */
-  //  int flags;			/* Don't save any more data from this
-  //  flow */ int last_access;		/* "Time" of last access */
+  //  int flags;			/* Don't save any more data from this flow */
+  //  int last_access;		/* "Time" of last access */
 };
 
 #define HASH_SIZE 0
