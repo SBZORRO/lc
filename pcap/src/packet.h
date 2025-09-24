@@ -1,5 +1,5 @@
 #include <netinet/in.h>
-#include <pcap.h>
+#include <pcap/pcap.h>
 #include <sys/types.h>
 
 /* ethernet headers are always exactly 14 bytes */
