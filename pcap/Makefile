@@ -20,6 +20,9 @@ convar: $(SRC)/convar.c
 hello: $(SRC)/main.c $(DEPS)
 	$(CC) -o $@ $^ -I. -lpcap
 
+hello2: $(SRC)/main.c $(DEPS)
+	$(CC) -o $@ $^ -I../src -I.. /lib64/libpcap.so.1
+
 test: $(SRC)/test.c $(DEPS)
 	$(CC) -o $@ $^ -I. -lpcap
 
