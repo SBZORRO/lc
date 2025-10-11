@@ -1,1 +1,1 @@
-.hello '((src host 10.160.231.153 and src port 9997) or (dst host 10.160.231.152 and dst port 9998))'  10.160.231.152 9999 10.160.231.153 9997
+.hello '((src host 10.160.231.153 and src port 9997) or (dst host 10.160.231.152 and dst port 9998))'  10.160.231.152:9999 10.160.231.153:9997
