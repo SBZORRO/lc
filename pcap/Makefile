@@ -2,35 +2,37 @@ CC := gcc
 
 CFLAGS := -Wall -std=c89 -I../src
 
-SRC := ../src
-BUILD := .
+SRC := ./src
+BLD := ./build
 
 SRCS := $(wildcard $(SRC)/*.c)
-OBJS := $(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(SRCS))
+OBJS := $(patsubst $(SRC)/%.c,$(BLD)/%.o,$(SRCS))
 DEPS := $(SRC)/pcapimpl.c $(SRC)/client.c $(SRC)/flow.c
 
-all: hello
+all: $(BLD)/hello
 
-%.o: $(SRC)/%.c
+$(BLD)/%.o: $(SRC)/%.c
 	$(CC) -c $<
 
-convar: $(SRC)/convar.c
+$(BLD)/convar: $(SRC)/convar.c
 	$(CC) -o $@ $^
 
-hello: $(SRC)/main.c $(DEPS)
+$(BLD)/hello: $(SRC)/main.c $(DEPS)
 	$(CC) -o $@ $^ -I. -lpcap
 
-hello2: $(SRC)/main.c $(DEPS)
+$(BLD)/hello2: $(SRC)/main.c $(DEPS)
 	$(CC) -o $@ $^ -I../src -I.. /lib64/libpcap.so.1
 
-test: $(SRC)/test.c $(DEPS)
+$(BLD)/test: $(SRC)/test.c $(DEPS)
 	$(CC) -o $@ $^ -I. -lpcap
 
-hello.so: $(SRC)/main.c
+$(BLD)/hello.so: $(SRC)/main.c
 	$(CC) -shared -fPIC -o $@ $< -lpcap
 
-client: $(SRC)/client.c
+$(BLD)/client: $(SRC)/client.c
 	$(CC) -o $@ $<
 
 clean:
-	rm *.o *.a *.so hello client
+	rm -rf $(BLD)/*
+
+.PHONY: all clean

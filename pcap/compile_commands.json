@@ -1,41 +1,54 @@
 [
   {
     "arguments": [
-      "/usr/bin/cc",
+      "/usr/bin/gcc",
       "-c",
       "-I.",
       "-o",
       "hello",
-      "main.c"
+      "src/main.c"
     ],
-    "directory": "/mnt/d/git-repo/lc/pcap",
-    "file": "/mnt/d/git-repo/lc/pcap/main.c",
-    "output": "/mnt/d/git-repo/lc/pcap/hello"
+    "directory": "/home/sbzorro/git-repo/lc/pcap",
+    "file": "/home/sbzorro/git-repo/lc/pcap/src/main.c",
+    "output": "/home/sbzorro/git-repo/lc/pcap/hello"
   },
   {
     "arguments": [
-      "/usr/bin/cc",
+      "/usr/bin/gcc",
       "-c",
       "-I.",
       "-o",
       "hello",
-      "client.c"
+      "src/pcapimpl.c"
     ],
-    "directory": "/mnt/d/git-repo/lc/pcap",
-    "file": "/mnt/d/git-repo/lc/pcap/client.c",
-    "output": "/mnt/d/git-repo/lc/pcap/hello"
+    "directory": "/home/sbzorro/git-repo/lc/pcap",
+    "file": "/home/sbzorro/git-repo/lc/pcap/src/pcapimpl.c",
+    "output": "/home/sbzorro/git-repo/lc/pcap/hello"
   },
   {
     "arguments": [
-      "/usr/bin/cc",
+      "/usr/bin/gcc",
       "-c",
       "-I.",
       "-o",
       "hello",
-      "flow.c"
+      "src/client.c"
     ],
-    "directory": "/mnt/d/git-repo/lc/pcap",
-    "file": "/mnt/d/git-repo/lc/pcap/flow.c",
-    "output": "/mnt/d/git-repo/lc/pcap/hello"
+    "directory": "/home/sbzorro/git-repo/lc/pcap",
+    "file": "/home/sbzorro/git-repo/lc/pcap/src/client.c",
+    "output": "/home/sbzorro/git-repo/lc/pcap/hello"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-I.",
+      "-o",
+      "hello",
+      "src/flow.c"
+    ],
+    "directory": "/home/sbzorro/git-repo/lc/pcap",
+    "file": "/home/sbzorro/git-repo/lc/pcap/src/flow.c",
+    "output": "/home/sbzorro/git-repo/lc/pcap/hello"
   }
 ]

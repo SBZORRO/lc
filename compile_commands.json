@@ -1,0 +1,84 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-fpic",
+      "-o",
+      "libvector.so",
+      "addvec.c"
+    ],
+    "directory": "/home/sbzorro/git-repo/lc",
+    "file": "/home/sbzorro/git-repo/lc/addvec.c",
+    "output": "/home/sbzorro/git-repo/lc/libvector.so"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-fpic",
+      "-o",
+      "libvector.so",
+      "multvec.c"
+    ],
+    "directory": "/home/sbzorro/git-repo/lc",
+    "file": "/home/sbzorro/git-repo/lc/multvec.c",
+    "output": "/home/sbzorro/git-repo/lc/libvector.so"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "addvec.c"
+    ],
+    "directory": "/home/sbzorro/git-repo/lc",
+    "file": "/home/sbzorro/git-repo/lc/addvec.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "multvec.c"
+    ],
+    "directory": "/home/sbzorro/git-repo/lc",
+    "file": "/home/sbzorro/git-repo/lc/multvec.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-o",
+      "hello",
+      "hello.c"
+    ],
+    "directory": "/home/sbzorro/git-repo/lc",
+    "file": "/home/sbzorro/git-repo/lc/hello.c",
+    "output": "/home/sbzorro/git-repo/lc/hello"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-fpic",
+      "-o",
+      "sum.so",
+      "sum.c"
+    ],
+    "directory": "/home/sbzorro/git-repo/lc",
+    "file": "/home/sbzorro/git-repo/lc/sum.c",
+    "output": "/home/sbzorro/git-repo/lc/sum.so"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "./sum.so",
+      "-o",
+      "main",
+      "main.c"
+    ],
+    "directory": "/home/sbzorro/git-repo/lc",
+    "file": "/home/sbzorro/git-repo/lc/main.c",
+    "output": "/home/sbzorro/git-repo/lc/main"
+  }
+]
