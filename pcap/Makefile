@@ -4,6 +4,7 @@ CFLAGS := -Wall -std=c89 -I../src
 
 SRC := ./src
 BLD := ./build
+TST := ./test
 
 SRCS := $(wildcard $(SRC)/*.c)
 OBJS := $(patsubst $(SRC)/%.c,$(BLD)/%.o,$(SRCS))
@@ -18,13 +19,13 @@ $(BLD)/convar: $(SRC)/convar.c
 	$(CC) -o $@ $^
 
 $(BLD)/hello: $(SRC)/main.c $(DEPS)
-	$(CC) -o $@ $^ -I. -lpcap
+	$(CC) -g -o $@ $^ -I. -lpcap
 
 $(BLD)/hello2: $(SRC)/main.c $(DEPS)
 	$(CC) -o $@ $^ -I../src -I.. /lib64/libpcap.so.1
 
-$(BLD)/test: $(SRC)/test.c $(DEPS)
-	$(CC) -o $@ $^ -I. -lpcap
+$(BLD)/test: $(TST)/test.c $(DEPS)
+	$(CC) -g -o $@ $^ -I. -lpcap
 
 $(BLD)/hello.so: $(SRC)/main.c
 	$(CC) -shared -fPIC -o $@ $< -lpcap

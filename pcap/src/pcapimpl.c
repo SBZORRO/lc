@@ -91,11 +91,11 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
       return;
     }
 
-  flow_t flow = find_flow (flow_ptr, flow_len, ip, tcp);
+  flow_t *flow = find_flow (flow_ptr, flow_len, ip->ip_src, tcp->th_sport);
   if ((tcp->th_flags & TH_SYN) || (tcp->th_flags & TH_FIN)
       || (tcp->th_flags & TH_RST))
     {
-      reset_flow (&flow);
+      reset_flow (flow);
     }
 
   size_payload = ntohs (ip->ip_len) - (size_ip + size_tcp);
@@ -104,21 +104,21 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
   u_int seq = ntohl (tcp->th_seq);
   u_int ack = ntohl (tcp->th_ack);
 
-  if (flow.isn == 0 && flow.nxt == 0)
+  if (flow->isn == 0 && flow->nxt == 0)
     {
-      flow.isn = seq;
-      flow.nxt = seq;
+      flow->isn = seq;
+      flow->nxt = seq;
     }
   /* create_flow_state (&flow, seq, size_payload, payload); */
-  if (flow.nxt == seq)
+  if (flow->nxt == seq)
     {
       do_sent ((char *) payload, (size_t) size_payload);
-      flow.nxt += size_payload;
+      flow->nxt += size_payload;
 
-      flow_state_t *state = flow.next;
-      while (state != NULL && flow.nxt == state->seq)
+      flow_state_t *state = flow->next;
+      while (state != NULL && flow->nxt == state->seq)
         {
-          state = detach_flow_state (&flow, state);
+          state = detach_flow_state (flow, state);
           do_sent ((char *) state->payload, (size_t) state->len);
           /*     flow.nxt += state->len; */
           /*     flow_state_t *tbf = state; */
@@ -129,7 +129,7 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
     }
   else
     {
-      create_flow_state (&flow, seq, size_payload, payload);
+      create_flow_state (flow, seq, size_payload, payload);
     }
 
   /* printf ("%u--%u--%u\n", flow.nxt, seq, ack); */

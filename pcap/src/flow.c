@@ -23,22 +23,31 @@ reset_flow (flow_t *flow)
   flow->next = NULL;
 }
 
-void
-init_flow (flow_t **flow, int len, char *argv[])
+flow_t **
+init_flow (flow_t **flow, int size)
 {
-  *flow = MALLOC (flow_t, len);
-  for (int i = 0, j = 0; i < len; i++, j++)
-    {
-      char *addr = argv[i];
-      char *ip = strtok (addr, ":");
-      char *port = strtok (NULL, "\0");
-      /* inet_aton (ip, &flow_ptr[j].ip_src); */
-      (*flow)[j].ip_src.s_addr = inet_addr (ip);
-      (*flow)[j].sport = htons (atoi (port));
-      (*flow)[j].next = NULL;
-      (*flow)[j].nxt = 0;
-      (*flow)[j].isn = 0;
-    }
+  *flow = MALLOC (flow_t, size);
+  return flow;
+}
+
+flow_t *
+add_flow (flow_t *flow, char *src, char *dst)
+{
+  char *dst_ip = strtok (dst, ":");
+  char *dst_port = strtok (NULL, "\0");
+
+  char *ip = strtok (src, ":");
+  char *port = strtok (NULL, "\0");
+
+  /* inet_aton (ip, &flow_ptr[j].ip_src); */
+  flow->ip_src.s_addr = inet_addr (ip);
+  flow->sport = htons (atoi (port));
+  flow->ip_dst.s_addr = inet_addr (dst_ip);
+  flow->dport = htons (atoi (dst_port));
+  flow->next = NULL;
+  flow->nxt = 0;
+  flow->isn = 0;
+  return flow;
 }
 
 void *
@@ -99,8 +108,7 @@ attach_flow_state (flow_t *flow, flow_state_t *new_flow_state)
 }
 
 flow_state_t *
-create_flow_state (flow_t *flow, u_int seq, u_int size_payload,
-                   const u_char *payload)
+create_flow_state (flow_t *flow, u_int seq, u_int size_payload, const u_char *payload)
 {
   flow_state_t *new_flow_state = MALLOC (flow_state_t, 1);
   new_flow_state->next = NULL;
@@ -136,15 +144,23 @@ create_flow_state (flow_t *flow, u_int seq, u_int size_payload,
 }
 
 void
+print_flow (flow_t *flow, int len)
+{
+  for (int i = 0; i < len; i++)
+    {
+      flow_t *f = &flow[i];
+      printf ("FLOW: %u\n", i);
+      printf ("  From: %s:%u\n", inet_ntoa (f->ip_src), ntohs (f->sport));
+      printf ("    To: %s:%u\n", inet_ntoa (f->ip_dst), ntohs (f->dport));
+      printf ("  next: %p\n", f->next);
+      printf ("   nxt: %u\n", f->nxt);
+      printf ("   isn: %u\n", f->isn);
+    }
+}
+
+void
 print_flow_state (flow_t *flow)
 {
-  /* print source and destination IP addresses */
-  /* printf ("       From: %s\n", inet_ntoa (flow->ip_src)); */
-  /* printf ("         To: %s\n", inet_ntoa (flow->ip_dst)); */
-
-  /* printf ("   Src port: %u\n", ntohs (flow->sport)); */
-  /* printf ("   Dst port: %u\n", ntohs (flow->dport)); */
-
   flow_state_t *ptr = flow->next;
   while (ptr != NULL)
     {
@@ -164,17 +180,15 @@ free_flow_state (flow_state_t *fs)
   free (fs);
 }
 
-flow_t
-find_flow (flow_t *flow, int len, const struct sniff_ip *ip,
-           const struct sniff_tcp *tcp)
+flow_t *
+find_flow (flow_t *flow, int len, const struct in_addr addr, const u_short port)
 {
   for (int i = 0; i < len; i++)
     {
-      if (flow[i].ip_src.s_addr == ip->ip_src.s_addr
-          && flow[i].sport == tcp->th_sport)
+      if (flow[i].ip_src.s_addr == addr.s_addr && flow[i].sport == port)
         {
-          return flow[i];
+          return flow + i;
         }
     }
-  return flow[0];
+  return flow;
 }

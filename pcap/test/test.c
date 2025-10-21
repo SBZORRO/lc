@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include "captotcp.h"
+#include "../src/captotcp.h"
 
 static int main_ret = 0;
 static int test_count = 0;
@@ -55,8 +55,9 @@ void
 test_create_flow (int argc, char *argv[])
 {
   flow_t *ptr;
-  int len = argc;
+  int len = argc - 2;
   INIT_FLOW (ptr, len, argc, argv);
+  printf ("INIT_FLOW\n");
   for (int i = 0; i < len; ++i)
     {
       char addr[22];
@@ -119,7 +120,7 @@ void
 test_attach_flow_state (int argc, char *argv[])
 {
   flow_t *ptr;
-  int len = argc;
+  int len = argc - 2;
   INIT_FLOW (ptr, len, argc, argv);
 
   ATTACH_FLOW_STATE (ptr, 123, 3, "123");
@@ -148,17 +149,17 @@ test_attach_flow_state (int argc, char *argv[])
 int
 main (int argc, char *argv[])
 {
-  argv++;
-  argc--;
   printf ("argc: %d\n", argc);
   for (int i = 0; i < argc; ++i)
     {
       printf ("argv: %s\n", argv[i]);
     }
+  printf ("test_create_flow\n");
   test_create_flow (argc, argv);
+  printf ("test_create_flow_state\n");
   test_create_flow_state ();
+  printf ("test_attach_flow_state\n");
   test_attach_flow_state (argc, argv);
-  printf ("%d/%d (%3.2f%%) passed\n", test_pass, test_count,
-          test_pass * 100.0 / test_count);
+  printf ("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
   return main_ret;
 }

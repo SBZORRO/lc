@@ -23,7 +23,8 @@ flow_state_t *detach_flow_state (flow_t *flow, flow_state_t *new_flow_state);
 void print_flow_state (flow_t *flow);
 void free_flow_state (flow_state_t *fs);
 
-flow_t find_flow (flow_t *flow, int len, const struct sniff_ip *ip,
-                  const struct sniff_tcp *tcp);
-void init_flow (flow_t **flow_ptr, int flow_len, char *argv[]);
+void print_flow (flow_t *flow, int len);
+flow_t *find_flow (flow_t *flow, int len, struct in_addr addr, u_short port);
+flow_t *add_flow (flow_t *, char *src_addr, char *dst_addr);
+flow_t **init_flow (flow_t **, int size);
 void reset_flow (flow_t *flow);

@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "captotcp.h"
+#include "../src/captotcp.h"
 
 static int main_ret = 0;
 static int test_count = 0;
@@ -43,11 +43,16 @@ check_malloc (size_t size)
 void
 test_create_flow ()
 {
-  char *argv[] = { "./hello",
-                   "'(src host 172.17.80.1 and src port 9997) or (dst host "
-                   "172.17.81.3 and dst port 9999)'",
-                   "192.168.5.17:9999", "172.17.81.3:9998" };
-  int argc = 4;
+  char *argv[]
+    = { "../build/hello",
+        "((src host 10.160.231.153 and src port 9997) or (dst host 10.160.231.152 and dst port 9998))",
+        "10.160.231.152:9999",
+        "10.160.231.153:9997",
+        "222.222.222.222:222",
+        "22.22.22.22:22",
+        "111.111.111.111:111",
+        "11.11.11.11:11" };
+  int argc = 8;
 
   char *addr = argv[3];
   printf ("%s", addr);
