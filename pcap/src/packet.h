@@ -1,6 +1,8 @@
+#include <bits/pthreadtypes.h>
 #include <netinet/in.h>
 #include <pcap/pcap.h>
 #include <sys/types.h>
+#include <time.h>
 
 /* ethernet headers are always exactly 14 bytes */
 #define SIZE_ETHERNET 14
@@ -72,14 +74,21 @@ typedef struct flow_struct flow_t;
 
 struct flow_struct
 {
-  flow_state_t *next; /* Link to next one */
-  u_int nxt; // expect byte
-  u_int isn; // init seq num
-  struct in_addr ip_src, ip_dst; /* source and dest address */
+  flow_state_t *next;                    /* Link to next one */
+  struct timespec ts;                    // last segment ts
+  pthread_t thread;                      // thread to process flow
+  u_int state;                           // thread state
+  u_int sock;                            // fd/socket to send
+  u_int size;                            // total flow_state
+  u_int flags;                           // syn: captured whole stream; rst/fin: don't save any more data from this flow
+  u_int nxt;                             // expect byte
+  u_int isn;                             // init seq num
+  struct in_addr ip_src, ip_dst, ip_tar; // pcap src and dst, server to send
   /* u_int32_t src;   /\* Source IP address *\/ */
   /* u_int32_t dst;   /\* Destination IP address *\/ */
-  u_short sport; /* Source port number */
-  u_short dport; /* Destination port number */
+  u_short port_src; /* Source port number */
+  u_short port_dst; /* Destination port number */
+  u_short port_tar; /* target server port number */
 };
 
 struct flow_state_struct
@@ -89,6 +98,7 @@ struct flow_state_struct
   // tcp_seq isn;                    /* Initial sequence number we've seen */
   u_int seq;
   u_int len;
+  u_int flags;
   u_char *payload;
   //  FILE *fp;			/* Pointer to file storing this flow's data */
   //  long pos; /* Current write position in fp */

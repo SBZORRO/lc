@@ -34,10 +34,17 @@ PenaltyBreakBeforeFirstCallParameter: 2000
 SpaceAfterCStyleCast: true
 SpaceBeforeParens: Always
 UseTab: Never
+
+# AllowShortBlocksOnASingleLine: true
+# ReflowComments: false
+# # Preprocessor and macros
+# MacroBlockBegin: "^\\s*do\\s*{"
+# MacroBlockEnd: "^\\s*}\\s*while\\s*\\(0\\)"
 ---
 Language: Cpp
 ---
 Language: ObjC
+---
 
 # Local Variables:
 # mode: yaml

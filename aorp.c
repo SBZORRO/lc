@@ -1,6 +1,12 @@
 
 #include <stdio.h>
+#include <stdlib.h>
 
+void
+valorref (int *pi)
+{
+  *pi = 123;
+}
 void
 aorp (int *ptr, int len)
 {
@@ -52,26 +58,28 @@ retpointer (struct point *p)
   p->y = 321;
   return p;
 }
+
 void
-valorref (int *ptr)
+domacro (char *str)
 {
-  printf ("%u\n", *ptr);
-  printf ("%p\n", ptr);
-  printf ("%p\n", &ptr);
-  int i = 123;
-  ptr = &i;
+  printf ("domacro: %s\n", str);
 }
+
+#define TESTMACRO(fun, arg)          \
+  do                                 \
+    {                                \
+      printf ("domacro: %s\n", arg); \
+      fun (arg);                     \
+    }                                \
+  while (0)
 
 int
 main ()
 {
-  int ii = 123;
-  int *ip = &ii;
-  printf ("%p\n", &ip);
-  printf ("%p\n", ip);
-  printf ("%p\n", &ii);
-  valorref (ip);
-  printf ("%p\n", ip);
+  int i = 0;
+  valorref (&i);
+  printf ("%u\n", i);
+
   int ia[10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 };
   aorp (ia, 10);
   for (int i = 0; i < 10; i++)
@@ -106,4 +114,38 @@ main ()
   pp.y = 111;
   printf ("\n%d,%d", p->x, p->y);
   printf ("\n%p", &pp);
+
+  printf ("\n\n");
+
+  char *fun = "domacro";
+  char *arg = "HELLO WORLD!";
+  TESTMACRO (domacro, arg);
+
+  char *addr[]
+    = { "10.160.231.152:9999",
+        "10.160.231.153:9997",
+        "222.222.222.222:222",
+        "22.22.22.22:22",
+        "111.111.111.111:111",
+        "11.11.11.11:11" };
+  printf ("sizeof: %lu\n", sizeof (addr));
+  printf ("sizeof: %lu\n", sizeof (addr) / sizeof (addr[0]));
+
+  printf ("\n");
+  struct point *points = NULL;
+  points = malloc (sizeof (struct point) * 10);
+  printf ("1: %p\n", points);
+  printf ("2: %p\n", *points);
+  printf ("3: %p\n", points[0]);
+  printf ("4: %p\n", &points);
+  printf ("5: %p\n", &points[0]);
+  printf ("6: %p\n", &points[1]);
+  printf ("7: %p\n", &(points[1]));
+  printf ("8: %p\n", (&points)[1]);
+  /* printf ("%p\n", &(points + 1)); */
+  printf ("9: %p\n", (&points) + 1);
+  printf ("a: %p\n", points + 1);
+  printf ("\n");
+
+  const char *flow[] = { "123", " ", "abger0[g]", "123", "       ", "1234567" };
 }

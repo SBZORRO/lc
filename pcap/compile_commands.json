@@ -3,52 +3,70 @@
     "arguments": [
       "/usr/bin/gcc",
       "-c",
+      "-g",
       "-I.",
       "-o",
-      "hello",
+      "build/hello",
       "src/main.c"
     ],
     "directory": "/home/sbzorro/git-repo/lc/pcap",
     "file": "/home/sbzorro/git-repo/lc/pcap/src/main.c",
-    "output": "/home/sbzorro/git-repo/lc/pcap/hello"
+    "output": "/home/sbzorro/git-repo/lc/pcap/build/hello"
   },
   {
     "arguments": [
       "/usr/bin/gcc",
       "-c",
+      "-g",
       "-I.",
       "-o",
-      "hello",
+      "build/hello",
       "src/pcapimpl.c"
     ],
     "directory": "/home/sbzorro/git-repo/lc/pcap",
     "file": "/home/sbzorro/git-repo/lc/pcap/src/pcapimpl.c",
-    "output": "/home/sbzorro/git-repo/lc/pcap/hello"
+    "output": "/home/sbzorro/git-repo/lc/pcap/build/hello"
   },
   {
     "arguments": [
       "/usr/bin/gcc",
       "-c",
+      "-g",
       "-I.",
       "-o",
-      "hello",
+      "build/hello",
       "src/client.c"
     ],
     "directory": "/home/sbzorro/git-repo/lc/pcap",
     "file": "/home/sbzorro/git-repo/lc/pcap/src/client.c",
-    "output": "/home/sbzorro/git-repo/lc/pcap/hello"
+    "output": "/home/sbzorro/git-repo/lc/pcap/build/hello"
   },
   {
     "arguments": [
       "/usr/bin/gcc",
       "-c",
+      "-g",
       "-I.",
       "-o",
-      "hello",
+      "build/hello",
       "src/flow.c"
     ],
     "directory": "/home/sbzorro/git-repo/lc/pcap",
     "file": "/home/sbzorro/git-repo/lc/pcap/src/flow.c",
-    "output": "/home/sbzorro/git-repo/lc/pcap/hello"
+    "output": "/home/sbzorro/git-repo/lc/pcap/build/hello"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-I.",
+      "-o",
+      "build/hello",
+      "log.c/log.c"
+    ],
+    "directory": "/home/sbzorro/git-repo/lc/pcap",
+    "file": "/home/sbzorro/git-repo/lc/pcap/log.c/log.c",
+    "output": "/home/sbzorro/git-repo/lc/pcap/build/hello"
   }
 ]
