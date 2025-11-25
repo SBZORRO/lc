@@ -21,6 +21,8 @@ extern flow_t *flow_ptr; // flow array
 extern int flow_len;     // flow array length
 extern int flow_cap;     // flow array cap
 
+char *filter_exp = "dst port 9998"; /* The filter expression */
+
 spsc_queue *pkt_que;
 #define PKT_QUE_CAP 1024
 
@@ -39,8 +41,8 @@ char *server[] = { NULL, "127.0.0.1:9998", "127.0.0.1:9999", NULL };
 void *
 th_send_flow (void *f)
 {
-  int rst = 0;
   flow_t *flow = (flow_t *) f;
+  int rst = 0;
   while (1)
     {
       flow_state_t *state = flow->next;
@@ -65,38 +67,38 @@ th_send_flow (void *f)
             }
         }
 
-      state = detach_flow_state (flow, state);
+      state = flow_state_pop (flow, state);
       do_sent (flow, (char *) state->payload, (size_t) state->len);
-      free_flow_state (state);
+      flow_state_free (state);
     }
   pthread_exit (NULL);
 }
 
 // singleton
-void *
-th_patrol_flow (void *f)
-{
-  while (1)
-    {
-      for (int i = 0; i < flow_len; i++)
-        {
-          flow_t *flow = flow_ptr + i;
-          flow_state_t *state = flow->next;
-          if (flow->sock == 0 && state != NULL)
-            {
-              int res = detect (flow);
-              if (res == 0)
-                {
-                  continue;
-                }
-              SET_IP (flow, tar, server[res]);
-              // set_dst (flow, server_servos);
-              pthread_create (&flow->thread, NULL, th_send_flow, (void *) flow);
-            }
-        }
-    }
-  pthread_exit (NULL);
-}
+/* void * */
+/* th_patrol_flow (void *f) */
+/* { */
+/*   while (1) */
+/*     { */
+/*       for (int i = 0; i < flow_len; i++) */
+/*         { */
+/*           flow_t *flow = flow_ptr + i; */
+/*           flow_state_t *state = flow->next; */
+/*           if (flow->sock == 0 && state != NULL) */
+/*             { */
+/*               int res = detect (flow); */
+/*               if (res == 0) */
+/*                 { */
+/*                   continue; */
+/*                 } */
+/*               SET_IP (flow, tar, server[res]); */
+/*               // set_dst (flow, server_servos); */
+/*               pthread_create (&flow->thread, NULL, th_send_flow, (void *) flow); */
+/*             } */
+/*         } */
+/*     } */
+/*   pthread_exit (NULL); */
+/* } */
 
 void *
 th_dispatch_flow (void *arg)
@@ -144,7 +146,7 @@ th_dispatch_flow (void *arg)
           return NULL;
         }
 
-      flow_t *flow = find_flow (flow_ptr, flow_len, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
+      flow_t *flow = flow_find (flow_ptr, flow_len, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
       flow->flags = flow->flags | tcp->th_flags;
 
       if (flow->state == 0)
@@ -179,13 +181,17 @@ th_dispatch_flow (void *arg)
           flow->nxt = seq;
         }
       /* create_flow_state (&flow, seq, size_payload, payload); */
-      flow_state_t *state = create_flow_state (flow, seq, size_payload, payload);
-      attach_flow_state (flow, state);
+      flow_state_t *state = flow_state_create (flow, seq, size_payload, payload);
+      flow_state_attach (flow, state);
       free (p);
     }
   pthread_exit (NULL);
 }
 
+/* 10.160.16.157 */
+/* 4001-4008 */
+/* dst host 10.160.16.157 and tcp dst portrange 4001-4008 */
+/* char filter_exp[] = "dst port 9998"; /\* The filter expression *\/ */
 int
 main (int argc, char *argv[])
 {
@@ -202,7 +208,7 @@ main (int argc, char *argv[])
   pkt_que = (spsc_queue *) check_malloc (bytes);
   spsc_init (pkt_que, PKT_QUE_CAP);
 
-  init_flow_ptr (&flow_ptr, flow_cap);
+  flow_ptr_init (&flow_ptr, flow_cap);
   /* args */
   /* filter_exp = argv[1]; */
   /* log_info ("filter_exp%s\n", filter_exp); */
@@ -218,7 +224,8 @@ main (int argc, char *argv[])
   /*     pthread_create (&threads[i], NULL, send_flow, (void *) flow); */
   /*   } */
 
-  loop ();
+  filter_exp = argv[1];
+  // loop (filter_exp);
 
   pthread_t tht_dispatch_flow;
   pthread_create (&tht_dispatch_flow, NULL, th_dispatch_flow, (void *) pkt_que);

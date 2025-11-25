@@ -16,47 +16,31 @@ flow_t *flow_ptr;
 int flow_len = 0;
 int flow_cap = 10;
 
-void
-reset_flow (flow_t *flow)
-{
-  flow_state_t *ptr = flow->next;
-  while (ptr != NULL)
-    {
-      free_flow_state (ptr);
-      ptr = ptr->next;
-    }
-  flow->next = NULL;
-  flow->flags = 0;
-  flow->isn = 0;
-  flow->nxt = 0;
-  flow->ts = (struct timespec) { 0 };
-}
-
-void
-reset_prev_flow (flow_t *flow, flow_t *cur)
-{
-  flow_state_t *ptr = flow->next;
-  while (ptr != NULL)
-    {
-      free_flow_state (ptr);
-      ptr = ptr->next;
-    }
-  flow->next = NULL;
-  flow->flags = 0;
-  flow->isn = 0;
-  flow->nxt = 0;
-  flow->ts = (struct timespec) { 0 };
-}
-
 flow_t **
-init_flow_ptr (flow_t **flow, int size)
+flow_ptr_init (flow_t **flow, int size)
 {
   *flow = MALLOC (flow_t, size);
   return flow;
 }
 
+void
+flow_reset (flow_t *flow)
+{
+  flow_state_t *ptr = flow->next;
+  while (ptr != NULL)
+    {
+      flow_state_free (ptr);
+      ptr = ptr->next;
+    }
+  flow->next = NULL;
+  flow->flags = 0;
+  flow->isn = 0;
+  flow->nxt = 0;
+  flow->ts = (struct timespec) { 0 };
+}
+
 flow_t *
-init_flow (flow_t *flow,
+flow_init (flow_t *flow,
            const struct in_addr src, const struct in_addr dst,
            const u_short sport, const u_short dport)
 {
@@ -68,6 +52,13 @@ init_flow (flow_t *flow,
   flow->next = NULL;
   flow->nxt = 0;
   flow->isn = 0;
+
+  // reentrant lock
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init (&attr);
+  pthread_mutexattr_settype (&attr, PTHREAD_MUTEX_RECURSIVE);
+  pthread_mutex_init (&flow->mutex, &attr);
+  pthread_mutexattr_destroy (&attr);
 
   /* SET_IP (flow, src, src_addr); */
   /* SET_IP (flow, src, dst_addr); */
@@ -96,7 +87,7 @@ init_flow (flow_t *flow,
 }
 
 flow_t *
-find_flow (flow_t *flow, int len,
+flow_find (flow_t *flow, int len,
            const struct in_addr src, const struct in_addr dst,
            const u_short sport, const u_short dport)
 {
@@ -115,15 +106,15 @@ find_flow (flow_t *flow, int len,
     }
   else
     {
-      f = grow_flow ();
+      f = flow_grow ();
     }
-  init_flow (f, src, dst, sport, dport);
+  flow_init (f, src, dst, sport, dport);
   flow_len++;
   return f;
 }
 
 flow_t *
-set_dst (flow_t *flow, char *dst_addr)
+flow_set_dst (flow_t *flow, char *dst_addr)
 {
   if (dst_addr != NULL)
     {
@@ -139,7 +130,7 @@ set_dst (flow_t *flow, char *dst_addr)
 }
 
 flow_t *
-set_src (flow_t *flow, char *src_addr)
+flow_set_src (flow_t *flow, char *src_addr)
 {
   if (src_addr != NULL)
     {
@@ -180,7 +171,7 @@ check_realloc (void *ptr, size_t size)
 }
 
 flow_t *
-grow_flow ()
+flow_grow ()
 {
   if (flow_len == flow_cap)
     {
@@ -198,20 +189,58 @@ grow_flow ()
   return flow_ptr + flow_len;
 }
 
-flow_state_t *
-detach_flow_state (flow_t *flow, flow_state_t *state)
+void
+flow_state_detach_before (flow_t *flow, flow_state_t *cur)
 {
-  flow->nxt += state->len;
-  flow_state_t *tbf = state;
-  state = state->next;
-  flow->next = state;
-  flow->size--;
-  return tbf;
+  flow_state_t *ptr = flow->next;
+  while (ptr != cur)
+    {
+      flow_state_pop (flow, ptr);
+      ptr = ptr->next;
+    }
 }
 
 flow_state_t *
-attach_flow_state (flow_t *flow, flow_state_t *state)
+flow_state_pop (flow_t *flow, flow_state_t *state)
 {
+  pthread_mutex_lock (&flow->mutex);
+  if (flow->nxt == state->seq)
+    {
+      flow->nxt += state->len;
+    }
+  flow->next = state->next;
+  flow->size--;
+  pthread_mutex_unlock (&flow->mutex);
+  return state;
+}
+
+flow_state_t *
+flow_state_detach (flow_t *flow, flow_state_t *state)
+{
+  pthread_mutex_lock (&flow->mutex);
+
+  flow_state_t *ptr = flow->next;
+  if (ptr == state)
+    {
+      return flow_state_pop (flow, state);
+    }
+
+  while (ptr->next != state)
+    {
+      ptr = ptr->next;
+    }
+  ptr->next = state->next;
+  flow->size--;
+
+  pthread_mutex_unlock (&flow->mutex);
+  return state;
+}
+
+flow_state_t *
+flow_state_attach (flow_t *flow, flow_state_t *state)
+{
+  pthread_mutex_lock (&flow->mutex);
+
   state->flow = flow;
   u_int seq = state->seq;
   flow_state_t **ptr = &(flow->next);
@@ -222,6 +251,7 @@ attach_flow_state (flow_t *flow, flow_state_t *state)
         {
           state->next = (*ptr)->next;
           *ptr = &(*state);
+          pthread_mutex_unlock (&flow->mutex);
           return state;
         }
       /* retrans packet */
@@ -229,6 +259,7 @@ attach_flow_state (flow_t *flow, flow_state_t *state)
         {
           state->next = *ptr;
           *ptr = &(*state);
+          pthread_mutex_unlock (&flow->mutex);
           return state;
         }
       ptr = &((*ptr)->next);
@@ -238,19 +269,23 @@ attach_flow_state (flow_t *flow, flow_state_t *state)
 
   flow->size++;
   clock_gettime (CLOCK_REALTIME, &flow->ts);
+
+  pthread_mutex_unlock (&flow->mutex);
   return state;
 }
 
 flow_state_t *
-create_flow_state (flow_t *flow, u_int seq, u_int size_payload, const u_char *payload)
+flow_state_create (flow_t *flow, u_int seq, u_int size_payload, const u_char *payload)
 {
-  flow_state_t *new_flow_state = MALLOC (flow_state_t, 1);
+  size_t bytes = sizeof (flow_state_t) + size_payload * sizeof (u_char);
+  flow_state_t *new_flow_state = check_malloc (bytes);
+  /* flow_state_t *new_flow_state = MALLOC (flow_state_t, 1); */
   new_flow_state->next = NULL;
   new_flow_state->flow = NULL;
   /* new_flow_state->flow = flow; */
   new_flow_state->seq = seq;
   new_flow_state->len = size_payload;
-  new_flow_state->payload = MALLOC (u_char, size_payload);
+  /* new_flow_state->payload = MALLOC (u_char, size_payload); */
   memcpy (new_flow_state->payload, payload, size_payload);
 
   /* flow_state_t **ptr = &(flow->next); */
@@ -278,7 +313,7 @@ create_flow_state (flow_t *flow, u_int seq, u_int size_payload, const u_char *pa
 }
 
 void
-print_flow (flow_t *flow, int len)
+flow_print (flow_t *flow, int len)
 {
   for (int i = 0; i < len; i++)
     {
@@ -293,7 +328,7 @@ print_flow (flow_t *flow, int len)
 }
 
 void
-print_flow_state (flow_t *flow)
+flow_state_print (flow_t *flow)
 {
   flow_state_t *ptr = flow->next;
   while (ptr != NULL)
@@ -309,7 +344,7 @@ print_flow_state (flow_t *flow)
 }
 
 void
-assemble_flow_state (flow_t *flow)
+flow_state_assemble (flow_t *flow)
 {
   flow_state_t *ptr = flow->next;
   while (ptr != NULL)
@@ -324,9 +359,8 @@ assemble_flow_state (flow_t *flow)
 }
 
 void
-free_flow_state (flow_state_t *fs)
+flow_state_free (flow_state_t *fs)
 {
-  free (fs->payload);
   free (fs);
 }
 

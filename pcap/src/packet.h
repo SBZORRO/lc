@@ -1,6 +1,7 @@
 #include <bits/pthreadtypes.h>
 #include <netinet/in.h>
 #include <pcap/pcap.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <time.h>
 
@@ -77,8 +78,10 @@ struct flow_struct
   flow_state_t *next;                    /* Link to next one */
   struct timespec ts;                    // last segment ts
   pthread_t thread;                      // thread to process flow
+  pthread_mutex_t mutex;                 // attach/detach mutex
   u_int state;                           // thread state
   u_int sock;                            // fd/socket to send
+  FILE *fp;                              // Pointer to file storing this flow's data
   u_int size;                            // total flow_state
   u_int flags;                           // syn: captured whole stream; rst/fin: don't save any more data from this flow
   u_int nxt;                             // expect byte
@@ -99,7 +102,7 @@ struct flow_state_struct
   u_int seq;
   u_int len;
   u_int flags;
-  u_char *payload;
+  u_char payload[];
   //  FILE *fp;			/* Pointer to file storing this flow's data */
   //  long pos; /* Current write position in fp */
   //  int flags;			/* Don't save any more data from this flow */

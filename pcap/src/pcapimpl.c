@@ -6,14 +6,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <time.h>
 #include "flow.h"
 #include "src/spsc_queue.h"
 
 unsigned int bufsize = 1024 * 1024 * 1024;
 
 /* char filter_exp[] = "dst port 9998"; /\* The filter expression *\/ */
-char *filter_exp = "dst port 9998"; /* The filter expression */
 
 extern flow_t *flow_ptr;
 extern int flow_len;
@@ -21,7 +19,7 @@ extern int flow_len;
 extern spsc_queue *pkt_que;
 
 int
-loop ()
+loop (char *filter_exp)
 {
   struct bpf_program fp; /* The compiled filter expression */
   bpf_u_int32 mask;      /* The netmask of our sniffing device */

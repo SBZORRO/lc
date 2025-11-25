@@ -33,28 +33,28 @@ int do_connect (struct in_addr sin_addr, u_short sin_port);
 #define REALLOC(ptr, type, num) (type *) check_realloc (ptr, (num) * sizeof (type))
 void *check_malloc (size_t size);
 void *check_realloc (void *ptr, size_t size);
-int loop ();
+
+int loop (char *filter_exp);
 char *get_if ();
 void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
 
-flow_state_t *create_flow_state (flow_t *flow, u_int seq, u_int size_payload,
-                                 const u_char *payload);
-flow_state_t *attach_flow_state (flow_t *flow, flow_state_t *new_flow_state);
-flow_state_t *detach_flow_state (flow_t *flow, flow_state_t *new_flow_state);
+flow_state_t *flow_state_create (flow_t *flow, u_int seq, u_int size_payload, const u_char *payload);
+flow_state_t *flow_state_attach (flow_t *flow, flow_state_t *new_flow_state);
+flow_state_t *flow_state_pop (flow_t *flow, flow_state_t *new_flow_state);
 
-void assemble_flow_state (flow_t *flow);
-void print_flow_state (flow_t *flow);
-void free_flow_state (flow_state_t *fs);
+void flow_state_assemble (flow_t *flow);
+void flow_state_print (flow_t *flow);
+void flow_state_free (flow_state_t *fs);
 
-void print_flow (flow_t *flow, int len);
-flow_t *find_flow (flow_t *flow, int len, struct in_addr src, struct in_addr dst, u_short sport, u_short dport);
-flow_t *init_flow (flow_t *flow, const struct in_addr src, const struct in_addr dst, const u_short sport, const u_short dport);
-flow_t **init_flow_ptr (flow_t **, int size);
-void reset_flow (flow_t *flow);
-flow_t *grow_flow ();
+void flow_print (flow_t *flow, int len);
+void flow_reset (flow_t *flow);
+flow_t *flow_find (flow_t *flow, int len, struct in_addr src, struct in_addr dst, u_short sport, u_short dport);
+flow_t *flow_init (flow_t *flow, const struct in_addr src, const struct in_addr dst, const u_short sport, const u_short dport);
+flow_t *flow_grow ();
+flow_t *flow_set_dst (flow_t *flow, char *dst_addr);
+flow_t *flow_set_src (flow_t *flow, char *src_addr);
 
-flow_t *set_dst (flow_t *flow, char *dst_addr);
-flow_t *set_src (flow_t *flow, char *src_addr);
+flow_t **flow_ptr_init (flow_t **, int size);
 
 int contain (u_char *str, int len, const char **targets);
 int detect (flow_t *flow);

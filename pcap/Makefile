@@ -9,7 +9,7 @@ LOG := ./log.c
 
 SRCS := $(wildcard $(SRC)/*.c)
 OBJS := $(patsubst $(SRC)/%.c,$(BLD)/%.o,$(SRCS))
-DEPS := $(SRC)/pcapimpl.c $(SRC)/client.c $(SRC)/flow.c $(LOG)/log.c
+DEPS := $(SRC)/pcapimpl.c $(SRC)/client.c $(SRC)/flow.c $(LOG)/log.c $(SRC)/logger.c
 
 all: $(BLD)/hello
 
