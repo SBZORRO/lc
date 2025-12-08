@@ -3,17 +3,19 @@
 #include "flow.h"
 #include "log.c/log.h"
 
+pthread_mutex_t MUTEX_LOG;
+void log_lock (bool lock, void *udata);
+
 void
 init_logger (FILE *fp)
 {
   log_set_level (LOG_DEBUG);
   log_set_quiet (0);
 
+  init_logger_lock ();
+
   log_add_fp (fp, LOG_DEBUG);
 }
-
-pthread_mutex_t MUTEX_LOG;
-void log_lock (bool lock, void *udata);
 
 int
 init_logger_lock ()
@@ -36,4 +38,10 @@ log_lock (bool lock, void *udata)
     pthread_mutex_lock (LOCK);
   else
     pthread_mutex_unlock (LOCK);
+}
+
+void
+logger_destory ()
+{
+  pthread_mutex_destroy (&MUTEX_LOG);
 }

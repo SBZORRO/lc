@@ -1,6 +1,8 @@
-#include <bits/pthreadtypes.h>
+#pragma once
 #include <netinet/in.h>
 #include <pcap/pcap.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <time.h>
@@ -70,43 +72,52 @@ struct sniff_tcp
   u_short th_urp; /* urgent pointer */
 };
 
-typedef struct flow_state_struct flow_state_t;
-typedef struct flow_struct flow_t;
+#ifndef CACHELINE
+# define CACHELINE 64
+#endif
 
-struct flow_struct
-{
-  flow_state_t *next;                    /* Link to next one */
-  struct timespec ts;                    // last segment ts
-  pthread_t thread;                      // thread to process flow
-  pthread_mutex_t mutex;                 // attach/detach mutex
-  u_int state;                           // thread state
-  u_int sock;                            // fd/socket to send
-  FILE *fp;                              // Pointer to file storing this flow's data
-  u_int size;                            // total flow_state
-  u_int flags;                           // syn: captured whole stream; rst/fin: don't save any more data from this flow
-  u_int nxt;                             // expect byte
-  u_int isn;                             // init seq num
-  struct in_addr ip_src, ip_dst, ip_tar; // pcap src and dst, server to send
-  /* u_int32_t src;   /\* Source IP address *\/ */
-  /* u_int32_t dst;   /\* Destination IP address *\/ */
-  u_short port_src; /* Source port number */
-  u_short port_dst; /* Destination port number */
-  u_short port_tar; /* target server port number */
-};
+typedef struct flow_struct flow_t;
+typedef struct flow_state_struct flow_state_t;
+typedef struct flow_array_struct flow_arr_t;
 
 struct flow_state_struct
 {
   flow_state_t *next; /* Link to next one */
   flow_t *flow;       /* Description of this flow */
-  // tcp_seq isn;                    /* Initial sequence number we've seen */
+  u_char *pkt;        /* pcap capture */
   u_int seq;
-  u_int len;
+  u_int ack;
   u_int flags;
-  u_char payload[];
-  //  FILE *fp;			/* Pointer to file storing this flow's data */
-  //  long pos; /* Current write position in fp */
-  //  int flags;			/* Don't save any more data from this flow */
-  //  int last_access;		/* "Time" of last access */
+  u_int len;
+  u_int offset_payload;
+};
+
+struct flow_struct
+{
+  flow_state_t *next;    /* Link to next one */
+  struct timespec ts;    // last segment ts
+  pthread_t thread;      // thread to process flow
+  pthread_mutex_t mutex; // attach/detach mutex
+  u_int flags;           // tcp flags/thread state
+#define SENDING 0x8000
+  u_int sock;    // fd/socket to send
+  FILE *fp;      // Pointer to file storing this flow's data
+  u_int size;    // total flow_state
+  u_int seg_nxt; // expect byt
+  struct in_addr
+    ip_src,
+    ip_dst,
+    ip_tar;         // pcap src and dst, server to send
+  u_short port_src; /* Source port number */
+  u_short port_dst; /* Destination port number */
+  u_short port_tar; /* target server port number */
+};
+
+struct flow_array_struct
+{
+  uint32_t flow_len;
+  uint32_t flow_cap;
+  flow_t flow[];
 };
 
 #define HASH_SIZE 0
@@ -114,3 +125,8 @@ struct flow_state_struct
   (((flow.sport & 0xff) | ((flow.dport & 0xff) << 8)         \
     | ((flow.src & 0xff) << 16) | ((flow.dst & 0xff) << 24)) \
    % HASH_SIZE)
+
+#define SEQ_LT(a, b) ((int32_t) ((a) - (b)) < 0)
+#define SEQ_LEQ(a, b) ((int32_t) ((a) - (b)) <= 0)
+#define SEQ_GT(a, b) ((int32_t) ((a) - (b)) > 0)
+#define SEQ_GEQ(a, b) ((int32_t) ((a) - (b)) >= 0)

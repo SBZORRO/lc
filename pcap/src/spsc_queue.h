@@ -3,6 +3,7 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <sys/types.h>
 
 #ifndef CACHELINE
 # define CACHELINE 64
@@ -18,9 +19,6 @@ typedef struct spsc_queue
   _Alignas (CACHELINE) _Atomic size_t head;
   // tail 只由生产者写，消费者读
   _Alignas (CACHELINE) _Atomic size_t tail;
-
-  // 避免 head / tail false sharing
-  char _pad1[CACHELINE - sizeof (_Atomic size_t)];
 
   void *buffer[];
 } spsc_queue;

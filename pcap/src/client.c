@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "flow.h"
+#include "src/packet.h"
 
 void
 do_sent (flow_t *flow, char *msg, int len)

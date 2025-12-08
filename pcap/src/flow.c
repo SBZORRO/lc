@@ -3,40 +3,51 @@
 #include <bits/time.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include "src/packet.h"
 
-flow_state_t *flow_hash[0];
-
-flow_t *flow_ptr;
-int flow_len = 0;
-int flow_cap = 10;
-
-flow_t **
-flow_ptr_init (flow_t **flow, int size)
+flow_arr_t *
+flow_arr_init (uint32_t size)
 {
-  *flow = MALLOC (flow_t, size);
+  return check_malloc (sizeof (flow_arr_t) + sizeof (flow_t) * size);
+}
+
+flow_arr_t *
+flow_arr_add (flow_arr_t *flow)
+{
+  if (flow->flow_len == flow->flow_cap)
+    {
+      flow_arr_t *new_flow = check_realloc (flow, sizeof (flow_arr_t) + sizeof (flow_t) * flow->flow_cap * 2);
+      new_flow->flow_cap = flow->flow_cap * 2;
+      new_flow->flow_len = flow->flow_len + 1;
+      return new_flow;
+    }
+  flow->flow_len = flow->flow_len + 1;
   return flow;
 }
 
-void
-flow_reset (flow_t *flow)
+flow_t *
+flow_find (flow_arr_t *fa,
+           const struct in_addr src, const struct in_addr dst,
+           const u_short sport, const u_short dport)
 {
-  flow_state_t *ptr = flow->next;
-  while (ptr != NULL)
+  for (int i = 0; i < fa->flow_len; i++)
     {
-      flow_state_free (ptr);
-      ptr = ptr->next;
+      if (fa->flow[i].ip_src.s_addr == src.s_addr
+          && fa->flow[i].port_src == sport
+          && fa->flow[i].ip_dst.s_addr == dst.s_addr
+          && fa->flow[i].port_dst == dport)
+        {
+          return fa->flow + i;
+        }
     }
-  flow->next = NULL;
-  flow->flags = 0;
-  flow->isn = 0;
-  flow->nxt = 0;
-  flow->ts = (struct timespec) { 0 };
+  return NULL;
 }
 
 flow_t *
@@ -50,8 +61,13 @@ flow_init (flow_t *flow,
   flow->port_dst = dport;
 
   flow->next = NULL;
-  flow->nxt = 0;
-  flow->isn = 0;
+  flow->seg_nxt = 0;
+  flow->size = 0;
+  flow->flags = 0;
+  flow->state = 0;
+  struct timespec ts = { 0 };
+  flow->sock = 0;
+  FILE *fp = NULL;
 
   // reentrant lock
   pthread_mutexattr_t attr;
@@ -60,58 +76,35 @@ flow_init (flow_t *flow,
   pthread_mutex_init (&flow->mutex, &attr);
   pthread_mutexattr_destroy (&attr);
 
-  /* SET_IP (flow, src, src_addr); */
-  /* SET_IP (flow, src, dst_addr); */
-  /* if (src_addr != NULL) */
-  /*   { */
-  /*     char *src = strdup (src_addr); */
-  /*     char *src_ip = strsep (&src, ":"); */
-  /*     char *src_port = strsep (&src, ":"); */
-  /*     /\* flow->ip_src.s_addr = inet_addr (ip); *\/ */
-  /*     inet_aton (src_ip, &flow->ip_src); */
-  /*     flow->port_src = htons (atoi (src_port)); */
-  /*     free (src); */
-  /*   } */
-  /* if (dst_addr != NULL) */
-  /*   { */
-  /*     char *dst = strdup (dst_addr); */
-  /*     char *dst_ip = strsep (&dst, ":"); */
-  /*     char *dst_port = strsep (&dst, ":"); */
-  /*     /\* flow->ip_dst.s_addr = inet_addr (dst_ip); *\/ */
-  /*     inet_aton (dst_ip, &flow->ip_dst); */
-  /*     flow->port_dst = htons (atoi (dst_port)); */
-  /*     free (dst); */
-  /*   } */
-
   return flow;
 }
 
-flow_t *
-flow_find (flow_t *flow, int len,
-           const struct in_addr src, const struct in_addr dst,
-           const u_short sport, const u_short dport)
+void
+flow_reset (flow_t *flow)
 {
-  for (int i = 0; i < len; i++)
+  flow_state_t *ptr = flow->next;
+  flow_state_t *cur = ptr;
+  while (ptr != NULL)
     {
-      if (flow[i].ip_src.s_addr == src.s_addr && flow[i].port_src == sport
-          && flow[i].ip_dst.s_addr == dst.s_addr && flow[i].port_dst == dport)
-        {
-          return flow + i;
-        }
+      cur = ptr;
+      ptr = ptr->next;
+      flow_state_free (cur);
     }
-  flow_t *f = NULL;
-  if (flow_len < flow_cap)
-    {
-      f = flow + len;
-    }
-  else
-    {
-      f = flow_grow ();
-    }
-  flow_init (f, src, dst, sport, dport);
-  flow_len++;
-  return f;
+  flow->next = NULL;
+  flow->flags = 0;
+  flow->seg_nxt = 0;
+  flow->ts = (struct timespec) { 0 };
 }
+
+/* flow_t * */
+/* flow_ring_in () */
+/* { */
+/*   u_int seq; */
+/*   u_int isn; */
+/*   u_int mask; */
+
+/*   int offset = (seq - isn) & mask; */
+/* } */
 
 flow_t *
 flow_set_dst (flow_t *flow, char *dst_addr)
@@ -145,50 +138,6 @@ flow_set_src (flow_t *flow, char *src_addr)
   return flow;
 }
 
-void *
-check_malloc (size_t size)
-{
-  void *ptr;
-
-  if ((ptr = malloc (size)) == NULL)
-    {
-      /* DEBUG(0) ("Malloc failed - out of memory?"); */
-      exit (1);
-    }
-  return ptr;
-}
-
-void *
-check_realloc (void *ptr, size_t size)
-{
-  void *newp = realloc (ptr, size);
-  if (newp == NULL && size != 0)
-    {
-      perror ("realloc");
-      // ptr 仍然安全，但你应该处理错误
-    }
-  return newp;
-}
-
-flow_t *
-flow_grow ()
-{
-  if (flow_len == flow_cap)
-    {
-      size_t new_flow_cap = flow_cap * 2;
-      flow_t *tmp = REALLOC (flow_ptr, flow_t, new_flow_cap);
-      if (!tmp)
-        {
-          perror ("realloc");
-          free (flow_ptr);
-          exit (1);
-        }
-      flow_ptr = tmp;
-      flow_cap = new_flow_cap;
-    }
-  return flow_ptr + flow_len;
-}
-
 void
 flow_state_detach_before (flow_t *flow, flow_state_t *cur)
 {
@@ -204,9 +153,9 @@ flow_state_t *
 flow_state_pop (flow_t *flow, flow_state_t *state)
 {
   pthread_mutex_lock (&flow->mutex);
-  if (flow->nxt == state->seq)
+  if (flow->seg_nxt <= state->seq)
     {
-      flow->nxt += state->len;
+      flow->seg_nxt += state->len;
     }
   flow->next = state->next;
   flow->size--;
@@ -255,7 +204,7 @@ flow_state_attach (flow_t *flow, flow_state_t *state)
           return state;
         }
       /* retrans packet */
-      if (seq < (*ptr)->seq)
+      if (SEQ_LT (seq, (*ptr)->seq))
         {
           state->next = *ptr;
           *ptr = &(*state);
@@ -275,45 +224,23 @@ flow_state_attach (flow_t *flow, flow_state_t *state)
 }
 
 flow_state_t *
-flow_state_create (flow_t *flow, u_int seq, u_int size_payload, const u_char *payload)
+flow_state_create (flow_t *flow, u_int seq, u_int ack, u_int flags, u_int size_payload, u_int offset_payload, u_char *payload)
 {
-  size_t bytes = sizeof (flow_state_t) + size_payload * sizeof (u_char);
-  flow_state_t *new_flow_state = check_malloc (bytes);
-  /* flow_state_t *new_flow_state = MALLOC (flow_state_t, 1); */
+  flow_state_t *new_flow_state = MALLOC (flow_state_t, 1);
   new_flow_state->next = NULL;
-  new_flow_state->flow = NULL;
-  /* new_flow_state->flow = flow; */
+  new_flow_state->flow = flow;
   new_flow_state->seq = seq;
+  new_flow_state->ack = ack;
   new_flow_state->len = size_payload;
-  /* new_flow_state->payload = MALLOC (u_char, size_payload); */
-  memcpy (new_flow_state->payload, payload, size_payload);
+  new_flow_state->offset_payload = offset_payload;
+  new_flow_state->flags = flags;
+  new_flow_state->pkt = payload;
 
-  /* flow_state_t **ptr = &(flow->next); */
-  /* while (*ptr != NULL) */
-  /*   { */
-  /*     /\* dup packet use new *\/ */
-  /*     if (seq == (*ptr)->seq) */
-  /*       { */
-  /*         new_flow_state->next = (*ptr)->next; */
-  /*         *ptr = &(*new_flow_state); */
-  /*         return new_flow_state; */
-  /*       } */
-  /*     /\* retrans packet *\/ */
-  /*     if (seq < (*ptr)->seq) */
-  /*       { */
-  /*         new_flow_state->next = *ptr; */
-  /*         *ptr = &(*new_flow_state); */
-  /*         return new_flow_state; */
-  /*       } */
-  /*     ptr = &((*ptr)->next); */
-  /*   } */
-
-  /* *ptr = &(*new_flow_state); */
   return new_flow_state;
 }
 
 void
-flow_print (flow_t *flow, int len)
+flow_print (flow_t *flow, u_int len)
 {
   for (int i = 0; i < len; i++)
     {
@@ -322,8 +249,7 @@ flow_print (flow_t *flow, int len)
       printf ("  From: %s:%u\n", inet_ntoa (f->ip_src), ntohs (f->port_src));
       printf ("    To: %s:%u\n", inet_ntoa (f->ip_dst), ntohs (f->port_dst));
       printf ("  next: %p\n", f->next);
-      printf ("   nxt: %u\n", f->nxt);
-      printf ("   isn: %u\n", f->isn);
+      printf ("   nxt: %u\n", f->seg_nxt);
     }
 }
 
@@ -335,7 +261,7 @@ flow_state_print (flow_t *flow)
     {
       for (int i = 0; i < ptr->len; ++i)
         {
-          printf ("%c", ptr->payload[i]);
+          printf ("%c", ptr->pkt[i]);
         }
       // printf ("%u\n", ptr->len);
       ptr = ptr->next;
@@ -351,7 +277,7 @@ flow_state_assemble (flow_t *flow)
     {
       for (int i = 0; i < ptr->len; ++i)
         {
-          printf ("%c", ptr->payload[i]);
+          printf ("%c", ptr->pkt[i]);
         }
       ptr = ptr->next;
     }
@@ -361,6 +287,7 @@ flow_state_assemble (flow_t *flow)
 void
 flow_state_free (flow_state_t *fs)
 {
+  free (fs->pkt);
   free (fs);
 }
 
@@ -382,7 +309,7 @@ const char *curve_phase_e = "\x81\x30\x80";
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 int
-contain (u_char *str, int len, const char **targets)
+contain (u_char *str, u_int len, const char **targets)
 {
   if (len == 0)
     {
@@ -417,11 +344,11 @@ detect (flow_t *flow)
   flow_state_t *ptr = flow->next;
   while (ptr != NULL)
     {
-      if (contain (ptr->payload, ptr->len, servos_resp))
+      if (contain (ptr->pkt, ptr->len, servos_resp))
         {
           return 1;
         }
-      if (contain (ptr->payload, ptr->len, servou_resp))
+      if (contain (ptr->pkt, ptr->len, servou_resp))
         {
           return 2;
         }

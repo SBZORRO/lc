@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include "../src/captotcp.h"
+#include "../src/flow.h"
+#include "/home/sbzorro/git-repo/lc/pcap/src/packet.h"
 
 char filter[] = "((src host 10.160.231.153 and src port 9997) or (dst host 10.160.231.152 and dst port 9998))";
 char *addrs[]
@@ -65,7 +66,7 @@ test_init_flow ()
   printf ("test_init_flow\n");
   flow_t *flow = NULL;
   EXPECT_EQ_PTR (flow, NULL);
-  init_flow_ptr (&flow, 2);
+  flow_ptr_init (&flow, 2);
   EXPECT_EQ_BASE (&flow != NULL, "NOT NULL", &flow, "%p");
 
   free (flow);
@@ -73,11 +74,20 @@ test_init_flow ()
 }
 
 void
-test_create_flow ()
+test_grow_flow ()
 {
   printf ("test_create_flow\n");
   flow_t *ptr = NULL;
   int len = 0;
+
+      flow_len = sizeof (addrs) / sizeof (addrs[0]);       
+      init_flow (&flow_ptr, flow_len);                     
+      for (int i = 0; i < flow_len; i = i + 2)             
+        {                                                  
+          add_flow (&flow_ptr[i], addrs[i], addrs[i + 1]);
+        }
+  
+  
   ADD_FLOW (ptr, len);
   for (int i = 0; i < len; i = i + 2)
     {

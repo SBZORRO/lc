@@ -8,8 +8,9 @@ TST := ./test
 LOG := ./log.c
 
 SRCS := $(wildcard $(SRC)/*.c)
+# SRCS := $(shell find . -name '*.c')
 OBJS := $(patsubst $(SRC)/%.c,$(BLD)/%.o,$(SRCS))
-DEPS := $(SRC)/pcapimpl.c $(SRC)/client.c $(SRC)/flow.c $(LOG)/log.c $(SRC)/logger.c
+DEPS := $(SRC)/pcapimpl.c $(SRC)/client.c $(SRC)/flow.c $(LOG)/log.c $(SRC)/logger.c $(SRC)/util.c
 
 all: $(BLD)/hello
 
