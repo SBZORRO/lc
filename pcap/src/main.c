@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <pcap/pcap.h>
@@ -11,9 +12,9 @@
 #include <time.h>
 #include <unistd.h>
 #include "flow.h"
+#include "log.c/log.h"
+#include "packet.h"
 #include "spsc_queue.h"
-#include "src/log.c/log.h"
-#include "src/packet.h"
 
 /* 10.160.16.157 */
 /* 4001-4008 */
@@ -22,22 +23,17 @@
 extern char *filter_exp; // pcap filter exp
 
 flow_arr_t *flow_ptr; // flow array
-#define FLOW_PTR_CAP 10
+#define FLOW_PTR_CAP 255
 
 char *filter_exp = "dst port 9998"; /* The filter expression */
 
 spsc_queue *pkt_que;
-#define PKT_QUE_CAP 1024
+// 2^n
+#define PKT_QUE_CAP 65536
 
 /* servos */
 /* servou */
 char *server[] = { NULL, "127.0.0.1:9998", "127.0.0.1:9999", NULL };
-
-/* RETSIGTYPE terminate(int sig) */
-/* { */
-/*   DEBUG(1) ("terminating"); */
-/*   exit(0); /\* libpcap uses onexit to clean up *\/ */
-/* } */
 
 // handler -> ring -> th_dispatch_flow -> flow -> th_send_flow
 
@@ -45,11 +41,14 @@ void *
 th_send_flow (void *f)
 {
   flow_t *flow = (flow_t *) f;
+  int rc = pthread_setname_np (pthread_self (), "send_flow");
+  if (rc != 0)
+    log_debug ("sendflow_setname: %s\n", strerror (rc));
   int rst = 0;
   while (1)
     {
       flow_state_t *state = flow->next;
-      if (state == NULL && flow->seg_nxt != state->seq)
+      if (state == NULL || flow->seg_nxt != state->seq)
         {
           if (rst++ > 60)
             {
@@ -60,57 +59,45 @@ th_send_flow (void *f)
           continue;
         }
       rst = 0;
-      if (flow->sock == 0)
-        {
-          int res = detect (flow);
-          if (res == 0)
-            {
-              continue;
-            }
-          SET_IP (flow, tar, server[res]);
-          while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) == 0)
-            {
-              sleep (1);
-            }
-        }
+      /* if (flow->sock == 0) */
+      /*   { */
+      /*     int res = detect (flow); */
+      /*     if (res == 0) */
+      /*       { */
+      /*         continue; */
+      /*       } */
+      /*     SET_IP (flow, tar, server[res]); */
+      /*     while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) == 0) */
+      /*       { */
+      /*         sleep (1); */
+      /*       } */
+      /*   } */
 
-      state = flow_state_pop (flow, state);
+      state = flow_state_pop (flow);
       log_debug ("sending: \n%s", state->pkt);
-      do_sent (flow, (char *) state->pkt + state->offset_payload, (size_t) state->len);
+      // do_sent (flow, (char *) state->pkt + state->offset_payload, (size_t) state->len);
+
+      /* write the data into the file */
+      if (fwrite ((char *) state->pkt + state->offset_payload, (size_t) state->size_payload, 1, flow->fp) != 1)
+        {
+          // DEBUG (1) ("write to %s failed: ", flow_filename (state->flow));
+          perror ("");
+        }
+      fflush (flow->fp);
       flow_state_free (state);
     }
+
   pthread_exit (NULL);
 }
-
-// singleton
-/* void * */
-/* th_patrol_flow (void *f) */
-/* { */
-/*   while (1) */
-/*     { */
-/*       for (int i = 0; i < flow_len; i++) */
-/*         { */
-/*           flow_t *flow = flow_ptr + i; */
-/*           flow_state_t *state = flow->next; */
-/*           if (flow->sock == 0 && state != NULL) */
-/*             { */
-/*               int res = detect (flow); */
-/*               if (res == 0) */
-/*                 { */
-/*                   continue; */
-/*                 } */
-/*               SET_IP (flow, tar, server[res]); */
-/*               // set_dst (flow, server_servos); */
-/*               pthread_create (&flow->thread, NULL, th_send_flow, (void *) flow); */
-/*             } */
-/*         } */
-/*     } */
-/*   pthread_exit (NULL); */
-/* } */
 
 void *
 th_dispatch_flow (void *arg)
 {
+  //  prctl (PR_SET_NAME, "main-thread", 0, 0, 0);
+  int rc = pthread_setname_np (pthread_self (), "dispatch_flow");
+  if (rc != 0)
+    log_debug ("dispatch_setname: %s\n", strerror (rc));
+
   spsc_queue *q = (spsc_queue *) arg;
 
   while (1)
@@ -169,7 +156,7 @@ th_dispatch_flow (void *arg)
       if (flow == NULL)
         {
           flow_ptr = flow_arr_add (flow_ptr);
-          flow = flow_ptr->flow + flow_ptr->flow_len;
+          flow = flow_ptr->flow + flow_ptr->flow_len - 1;
           flow_init (flow, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
         }
 
@@ -190,8 +177,11 @@ th_dispatch_flow (void *arg)
               free (p);
               continue;
             }
+          if (flow->flags == 0)
+            {
+              flow->seg_nxt = seq;
+            }
           flow->flags = flow->flags | tcp->th_flags;
-          flow->seg_nxt = seq;
           break;
         }
 
@@ -215,13 +205,19 @@ th_dispatch_flow (void *arg)
           // 调整指针和长度：payload += (r - s); len = new_len;
         }
 
-      flow_state_t *state = flow_state_create (flow, seq, ack, tcp->th_flags, size_payload, offset_payload, payload);
+      flow_state_t *state = flow_state_create (flow, seq, ack, tcp->th_flags, size_payload, offset_payload, p);
       flow_state_attach (flow, state);
 
       if (!(flow->flags & SENDING))
         {
+          char *name = flow_filename (flow);
+          if (flow->fp == NULL)
+            {
+              flow->fp = fopen (name, "ab");
+              flow->flags = flow->flags | SENDING;
+            }
           pthread_create (&flow->thread, NULL, th_send_flow, (void *) flow);
-          flow->flags = flow->flags | SENDING;
+          // int rc = pthread_setname_np (pthread_self (), name);
         }
     }
   pthread_exit (NULL);
@@ -261,10 +257,6 @@ main (int argc, char *argv[])
   loop (filter_exp);
 
   pthread_exit (NULL);
-
-  /* portable_signal(SIGTERM, terminate); */
-  /* portable_signal(SIGINT, terminate); */
-  /* portable_signal(SIGHUP, terminate); */
 
   fclose (fp);
 }

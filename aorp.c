@@ -1,4 +1,5 @@
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -148,4 +149,12 @@ main ()
   printf ("\n");
 
   const char *flow[] = { "123", " ", "abger0[g]", "123", "       ", "1234567" };
+
+  uint8_t *s = "1234567890";
+  uint8_t *ss[] = { "1234567890", "123" };
+  printf ("sizeof: %u\n", sizeof ("1234567890"));
+  printf ("sizeof: %u\n", sizeof (s));
+  printf ("sizeof: %u\n", sizeof ((uint8_t *) "1234567890"));
+  printf ("sizeof: %u\n", sizeof (ss[0]));
+  printf ("sizeof: %u\n", sizeof (ss));
 }

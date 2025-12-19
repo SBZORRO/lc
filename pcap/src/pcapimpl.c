@@ -7,8 +7,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include "flow.h"
-#include "src/log.c/log.h"
-#include "src/spsc_queue.h"
+#include "log.c/log.h"
+#include "spsc_queue.h"
 
 unsigned int bufsize = 1024 * 1024 * 1024;
 

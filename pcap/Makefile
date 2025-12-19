@@ -1,11 +1,11 @@
 CC := gcc
 
-CFLAGS := -Wall -pedantic -I../src
+CFLAGS := -Wall -fsanitize=address,undefined -fno-omit-frame-pointer -I../src
 
 SRC := ./src
 BLD := ./build
 TST := ./test
-LOG := ./log.c
+LOG := $(SRC)/log.c
 
 SRCS := $(wildcard $(SRC)/*.c)
 # SRCS := $(shell find . -name '*.c')
@@ -21,13 +21,13 @@ $(BLD)/convar: $(SRC)/convar.c
 	$(CC) -o $@ $^
 
 $(BLD)/hello: $(SRC)/main.c $(DEPS)
-	$(CC) -g -o $@ $^ -I. -lpcap
+	$(CC) $(CFLAGS) -g -o $@ $^ -I. -lpcap
 
 $(BLD)/hello2: $(SRC)/main.c $(DEPS)
 	$(CC) -o $@ $^ -I../src -I.. /lib64/libpcap.so.1
 
 $(BLD)/test: $(TST)/test.c $(DEPS)
-	$(CC) -g -o $@ $^ -I. -lpcap
+	$(CC) $(CFLAGS) -g -o $@ $^ -I. -lpcap
 
 $(BLD)/hello.so: $(SRC)/main.c
 	$(CC) -shared -fPIC -o $@ $< -lpcap

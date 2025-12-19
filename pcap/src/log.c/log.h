@@ -20,7 +20,7 @@ typedef struct {
   const char *fmt;
   const char *file;
   struct tm *time;
-  void *udata;
+  void *udata; // fp, callback->udata
   int line;
   int level;
 } log_Event;

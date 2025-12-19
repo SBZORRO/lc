@@ -35,9 +35,9 @@ SpaceAfterCStyleCast: true
 SpaceBeforeParens: Always
 UseTab: Never
 
-# AllowShortBlocksOnASingleLine: true
-# ReflowComments: false
-# # Preprocessor and macros
+BreakStringLiterals: false
+
+# Preprocessor and macros
 # MacroBlockBegin: "^\\s*do\\s*{"
 # MacroBlockEnd: "^\\s*}\\s*while\\s*\\(0\\)"
 ---

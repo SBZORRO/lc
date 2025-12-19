@@ -12,9 +12,9 @@ init_logger (FILE *fp)
   log_set_level (LOG_DEBUG);
   log_set_quiet (0);
 
-  init_logger_lock ();
+  // init_logger_lock ();
 
-  log_add_fp (fp, LOG_DEBUG);
+  int id = log_add_fp (fp, LOG_DEBUG);
 }
 
 int

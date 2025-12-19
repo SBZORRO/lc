@@ -1,8 +1,12 @@
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
+#include <unistd.h>
 #include "flow.h"
+#include "src/packet.h"
 
 void *
 check_malloc (size_t size)
@@ -29,8 +33,6 @@ check_realloc (void *ptr, size_t size)
     }
   return newp;
 }
-
-#define RING_SIZE 6
 
 char *
 flow_filename (flow_t *flow)
@@ -62,4 +64,59 @@ print_hex (const u_char *buf, size_t len)
   for (size_t i = 0; i < len; i++)
     printf ("%02x ", buf[i]);
   putchar ('\n');
+}
+
+static char *debug_prefix = NULL;
+#define DEBUG(message_level)        \
+  if (debug_level >= message_level) \
+  debug_real
+
+/*
+ * Remember our program name and process ID so we can use them later
+ * for printing debug messages
+ */
+void
+init_debug (char *argv[])
+{
+  debug_prefix = MALLOC (char, strlen (argv[0]) + 16);
+  sprintf (debug_prefix, "%s[%d]", argv[0], (int) getpid ());
+}
+
+/*
+ * Print a debugging message, given a va_list
+ */
+void
+print_debug_message (char *fmt, va_list ap)
+{
+  /* print debug prefix */
+  fprintf (stderr, "%s: ", debug_prefix);
+
+  /* print the var-arg buffer passed to us */
+  vfprintf (stderr, fmt, ap);
+
+  /* add newline */
+  fprintf (stderr, "\n");
+  (void) fflush (stderr);
+}
+
+/* Print a debugging or informational message */
+void
+debug_real (char *fmt, ...)
+{
+  va_list ap;
+
+  va_start (ap, fmt);
+  print_debug_message (fmt, ap);
+  va_end (ap);
+}
+
+/* Print a debugging or informatioal message, then exit  */
+void
+die (char *fmt, ...)
+{
+  va_list ap;
+
+  va_start (ap, fmt);
+  print_debug_message (fmt, ap);
+  exit (1);
 }

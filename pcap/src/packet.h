@@ -88,7 +88,7 @@ struct flow_state_struct
   u_int seq;
   u_int ack;
   u_int flags;
-  u_int len;
+  u_int size_payload;
   u_int offset_payload;
 };
 

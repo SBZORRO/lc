@@ -10,12 +10,16 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include "src/log.c/log.h"
 #include "src/packet.h"
 
 flow_arr_t *
 flow_arr_init (uint32_t size)
 {
-  return check_malloc (sizeof (flow_arr_t) + sizeof (flow_t) * size);
+  flow_arr_t *p = check_malloc (sizeof (flow_arr_t) + sizeof (flow_t) * size);
+  p->flow_cap = size;
+  p->flow_len = 0;
+  return p;
 }
 
 flow_arr_t *
@@ -23,10 +27,13 @@ flow_arr_add (flow_arr_t *flow)
 {
   if (flow->flow_len == flow->flow_cap)
     {
-      flow_arr_t *new_flow = check_realloc (flow, sizeof (flow_arr_t) + sizeof (flow_t) * flow->flow_cap * 2);
-      new_flow->flow_cap = flow->flow_cap * 2;
-      new_flow->flow_len = flow->flow_len + 1;
-      return new_flow;
+      /* TODO rework */
+      /* flow_arr_t *new_flow = check_realloc (flow, sizeof (flow_arr_t) + sizeof (flow_t) * flow->flow_cap * 2); */
+      /* new_flow->flow_cap = flow->flow_cap * 2; */
+      /* new_flow->flow_len = flow->flow_len + 1; */
+      /* return new_flow; */
+      log_error ("OVERFLOW!");
+      return NULL;
     }
   flow->flow_len = flow->flow_len + 1;
   return flow;
@@ -59,15 +66,16 @@ flow_init (flow_t *flow,
   flow->port_src = sport;
   flow->ip_dst = dst;
   flow->port_dst = dport;
+  flow->ip_tar.s_addr = 0;
+  flow->port_tar = 0;
 
   flow->next = NULL;
-  flow->seg_nxt = 0;
-  flow->size = 0;
-  flow->flags = 0;
-  flow->state = 0;
   struct timespec ts = { 0 };
+  flow->flags = 0;
   flow->sock = 0;
   FILE *fp = NULL;
+  flow->size = 0;
+  flow->seg_nxt = 0;
 
   // reentrant lock
   pthread_mutexattr_t attr;
@@ -83,28 +91,36 @@ void
 flow_reset (flow_t *flow)
 {
   flow_state_t *ptr = flow->next;
-  flow_state_t *cur = ptr;
-  while (ptr != NULL)
+  flow->next = NULL; // detach first
+  while (ptr)
     {
-      cur = ptr;
-      ptr = ptr->next;
-      flow_state_free (cur);
+      flow_state_t *next = ptr->next;
+      flow_state_free (ptr);
+      ptr = next;
     }
+
+  flow->ip_src.s_addr = 0;
+  flow->port_src = 0;
+  flow->ip_dst.s_addr = 0;
+  flow->port_dst = 0;
+  flow->ip_tar.s_addr = 0;
+  flow->port_tar = 0;
+
   flow->next = NULL;
+  struct timespec ts = { 0 };
   flow->flags = 0;
+  flow->sock = 0;
+  FILE *fp = NULL;
+  flow->size = 0;
   flow->seg_nxt = 0;
-  flow->ts = (struct timespec) { 0 };
+
+  /* // reentrant lock */
+  /* pthread_mutexattr_t attr; */
+  /* pthread_mutexattr_init (&attr); */
+  /* pthread_mutexattr_settype (&attr, PTHREAD_MUTEX_RECURSIVE); */
+  /* pthread_mutex_init (&flow->mutex, &attr); */
+  /* pthread_mutexattr_destroy (&attr); */
 }
-
-/* flow_t * */
-/* flow_ring_in () */
-/* { */
-/*   u_int seq; */
-/*   u_int isn; */
-/*   u_int mask; */
-
-/*   int offset = (seq - isn) & mask; */
-/* } */
 
 flow_t *
 flow_set_dst (flow_t *flow, char *dst_addr)
@@ -144,23 +160,26 @@ flow_state_detach_before (flow_t *flow, flow_state_t *cur)
   flow_state_t *ptr = flow->next;
   while (ptr != cur)
     {
-      flow_state_pop (flow, ptr);
+      flow_state_pop (flow);
       ptr = ptr->next;
     }
 }
 
 flow_state_t *
-flow_state_pop (flow_t *flow, flow_state_t *state)
+flow_state_pop (flow_t *flow)
 {
   pthread_mutex_lock (&flow->mutex);
-  if (flow->seg_nxt <= state->seq)
+
+  flow_state_t *state = flow->next;
+  if (flow->seg_nxt >= state->seq)
     {
-      flow->seg_nxt += state->len;
+      flow->seg_nxt += state->size_payload;
     }
   flow->next = state->next;
   flow->size--;
+
   pthread_mutex_unlock (&flow->mutex);
-  return state;
+  return flow->next;
 }
 
 flow_state_t *
@@ -168,21 +187,31 @@ flow_state_detach (flow_t *flow, flow_state_t *state)
 {
   pthread_mutex_lock (&flow->mutex);
 
+  if (state == NULL || flow->next == NULL)
+    {
+      return NULL;
+    }
+
   flow_state_t *ptr = flow->next;
   if (ptr == state)
     {
-      return flow_state_pop (flow, state);
+      return flow_state_pop (flow);
     }
 
   while (ptr->next != state)
     {
+      if (ptr->next == NULL)
+        {
+          return NULL;
+        }
       ptr = ptr->next;
     }
+
   ptr->next = state->next;
   flow->size--;
 
   pthread_mutex_unlock (&flow->mutex);
-  return state;
+  return ptr->next;
 }
 
 flow_state_t *
@@ -190,51 +219,78 @@ flow_state_attach (flow_t *flow, flow_state_t *state)
 {
   pthread_mutex_lock (&flow->mutex);
 
-  state->flow = flow;
   u_int seq = state->seq;
-  flow_state_t **ptr = &(flow->next);
-  while (*ptr != NULL)
+  clock_gettime (CLOCK_REALTIME, &flow->ts);
+  if (flow->next == NULL)
     {
+      flow->next = state;
+      flow->size++;
+      pthread_mutex_unlock (&flow->mutex);
+      return state;
+    }
+  else
+    {
+      flow_state_t *ptr = flow->next;
       /* dup packet use new */
-      if (seq == (*ptr)->seq)
+      if (seq == ptr->seq)
         {
-          state->next = (*ptr)->next;
-          *ptr = &(*state);
+          flow->next = state;
           pthread_mutex_unlock (&flow->mutex);
           return state;
         }
       /* retrans packet */
-      if (SEQ_LT (seq, (*ptr)->seq))
+      if (SEQ_LT (seq, ptr->seq))
         {
-          state->next = *ptr;
-          *ptr = &(*state);
+          state->next = flow->next;
+          flow->next = state;
+          flow->size++;
           pthread_mutex_unlock (&flow->mutex);
           return state;
         }
-      ptr = &((*ptr)->next);
+
+      flow_state_t *prev = flow->next;
+      ptr = prev->next;
+      while (ptr != NULL)
+        {
+          /* dup packet use new */
+          if (seq == ptr->seq)
+            {
+              state->next = ptr->next;
+              prev->next = state;
+              pthread_mutex_unlock (&flow->mutex);
+              return state;
+            }
+          /* retrans packet */
+          if (SEQ_LT (seq, ptr->seq))
+            {
+              state->next = ptr;
+              prev->next = state;
+              flow->size++;
+              pthread_mutex_unlock (&flow->mutex);
+              return state;
+            }
+          prev = ptr;
+          ptr = ptr->next;
+        }
+      prev->next = state;
+      flow->size++;
+      pthread_mutex_unlock (&flow->mutex);
+      return state;
     }
-
-  *ptr = &(*state);
-
-  flow->size++;
-  clock_gettime (CLOCK_REALTIME, &flow->ts);
-
-  pthread_mutex_unlock (&flow->mutex);
-  return state;
 }
 
 flow_state_t *
-flow_state_create (flow_t *flow, u_int seq, u_int ack, u_int flags, u_int size_payload, u_int offset_payload, u_char *payload)
+flow_state_create (flow_t *flow, u_int seq, u_int ack, u_int flags, u_int size_payload, u_int offset_payload, u_char *pkt)
 {
   flow_state_t *new_flow_state = MALLOC (flow_state_t, 1);
   new_flow_state->next = NULL;
   new_flow_state->flow = flow;
   new_flow_state->seq = seq;
   new_flow_state->ack = ack;
-  new_flow_state->len = size_payload;
+  new_flow_state->size_payload = size_payload;
   new_flow_state->offset_payload = offset_payload;
   new_flow_state->flags = flags;
-  new_flow_state->pkt = payload;
+  new_flow_state->pkt = pkt;
 
   return new_flow_state;
 }
@@ -259,7 +315,7 @@ flow_state_print (flow_t *flow)
   flow_state_t *ptr = flow->next;
   while (ptr != NULL)
     {
-      for (int i = 0; i < ptr->len; ++i)
+      for (int i = 0; i < ptr->size_payload; ++i)
         {
           printf ("%c", ptr->pkt[i]);
         }
@@ -275,7 +331,7 @@ flow_state_assemble (flow_t *flow)
   flow_state_t *ptr = flow->next;
   while (ptr != NULL)
     {
-      for (int i = 0; i < ptr->len; ++i)
+      for (int i = 0; i < ptr->size_payload; ++i)
         {
           printf ("%c", ptr->pkt[i]);
         }
@@ -287,7 +343,15 @@ flow_state_assemble (flow_t *flow)
 void
 flow_state_free (flow_state_t *fs)
 {
-  free (fs->pkt);
+  if (fs == NULL)
+    return;
+  fs->next = NULL;
+  fs->flow = NULL;
+  if (fs->pkt != NULL)
+    {
+      free (fs->pkt); // only if pkt is truly heap-owned by this node
+    }
+  fs->pkt = NULL;
   free (fs);
 }
 
@@ -344,11 +408,11 @@ detect (flow_t *flow)
   flow_state_t *ptr = flow->next;
   while (ptr != NULL)
     {
-      if (contain (ptr->pkt, ptr->len, servos_resp))
+      if (contain (ptr->pkt, ptr->size_payload, servos_resp))
         {
           return 1;
         }
-      if (contain (ptr->pkt, ptr->len, servou_resp))
+      if (contain (ptr->pkt, ptr->size_payload, servou_resp))
         {
           return 2;
         }
