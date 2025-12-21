@@ -48,7 +48,7 @@ th_send_flow (void *f)
   while (1)
     {
       flow_state_t *state = flow->next;
-      if (state == NULL || flow->seg_nxt != state->seq)
+      if (state == NULL || SEQ_LT (flow->seg_nxt, state->seq))
         {
           if (rst++ > 60)
             {
@@ -59,6 +59,21 @@ th_send_flow (void *f)
           continue;
         }
       rst = 0;
+
+      uint32_t e = state->seq + state->size_payload; // [s, e)
+      // outside of window
+      if (SEQ_LEQ (e, flow->seg_nxt))
+        {
+          log_debug ("DISCARD");
+          flow_state_free (state);
+          continue;
+        }
+      else if (SEQ_LT (state->seq, flow->seg_nxt) && SEQ_GT (e, flow->seg_nxt)) // overlap
+        {
+          state->size_payload = e - flow->seg_nxt;
+          state->offset_payload = state->offset_payload + flow->seg_nxt - state->seq;
+        }
+
       /* if (flow->sock == 0) */
       /*   { */
       /*     int res = detect (flow); */
@@ -189,7 +204,7 @@ th_dispatch_flow (void *arg)
 
       uint32_t e = seq + size_payload; // [s, e)
       // outside of window
-      if (SEQ_LT (e, flow->seg_nxt))
+      if (SEQ_LEQ (e, flow->seg_nxt))
         {
           log_debug ("DISCARD");
           free (p);
@@ -201,7 +216,7 @@ th_dispatch_flow (void *arg)
           // 左半段是重复数据，右半段是新数据
           // 需要把 [s, r) 裁掉，只保留 [r, e)
           size_payload = e - flow->seg_nxt;
-          offset_payload = e - size_payload;
+          offset_payload = offset_payload + flow->seg_nxt - seq;
           // 调整指针和长度：payload += (r - s); len = new_len;
         }
 

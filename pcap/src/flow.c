@@ -178,6 +178,25 @@ flow_state_pop (flow_t *flow)
   flow->next = state->next;
   flow->size--;
 
+        uint32_t e = seq + size_payload; // [s, e)
+      // outside of window
+      if (SEQ_LEQ (e, flow->seg_nxt))
+        {
+          log_debug ("DISCARD");
+          free (p);
+          continue;
+        }
+      else if (SEQ_LT (seq, flow->seg_nxt) && SEQ_GT (e, flow->seg_nxt)) // overlap
+        {
+          // s < r < e
+          // 左半段是重复数据，右半段是新数据
+          // 需要把 [s, r) 裁掉，只保留 [r, e)
+          size_payload = e - flow->seg_nxt;
+          offset_payload = offset_payload + flow->seg_nxt - seq;
+          // 调整指针和长度：payload += (r - s); len = new_len;
+        }
+  
+
   pthread_mutex_unlock (&flow->mutex);
   return flow->next;
 }
@@ -325,19 +344,22 @@ flow_state_print (flow_t *flow)
   printf ("\n");
 }
 
-void
-flow_state_assemble (flow_t *flow)
+uint32_t
+flow_state_assemble (flow_t *flow, uint8_t *buffer)
 {
-  flow_state_t *ptr = flow->next;
-  while (ptr != NULL)
+  flow_state_t *state = flow->next;
+  int i = 0;
+  while (state != NULL)
     {
-      for (int i = 0; i < ptr->size_payload; ++i)
-        {
-          printf ("%c", ptr->pkt[i]);
-        }
-      ptr = ptr->next;
+      memcpy (buffer + i, state->pkt + state->offset_payload, state->size_payload);
+      i = i + state->size_payload;
+      /* for (int i = 0; i < state->size_payload; ++i) */
+      /*   { */
+      /*     printf ("%c", state->pkt[i]); */
+      /*   } */
+      state = state->next;
     }
-  printf ("\n");
+  return i;
 }
 
 void

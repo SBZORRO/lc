@@ -84,10 +84,10 @@ static int test_pass = 0;
       memcpy (dst, state->pkt + state->offset_payload, state->size_payload); \
       int r = memcmp (tar, dst, state->size_payload);                        \
       EXPECT_EQ_INT (0, r);                                                  \
+      free (dst);                                                            \
       if (ptr == NULL)                                                       \
         {                                                                    \
           flow_state_free (state);                                           \
-          free (dst);                                                        \
         }                                                                    \
       else                                                                   \
         {                                                                    \
@@ -143,29 +143,86 @@ test_flow_state_attach_partially ()
   flow_t *ptr = &flow;
   flow_init (ptr, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
   // clang-format off
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 123, 3, 0, "123", 3, "123");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 8239, 4, 4, "1234567890", 10, "5678");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 823, 4, 4, "\x0" "\x0" "34567890", 10, "5678");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 8323, 4, 0, "\x0" "\x0" "34567890", 10, "\x0" "\x0" "34");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 8293, 3, 0, "\x0" "\x0" "34567890", 10, "\x0" "\x0" "3");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 8023, 2, 0, "\x0" "\x0" "34567890", 10, "\x0" "\x0");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 8823, 1, 0, "\x0" "\x0" "34567890", 10, "\x0");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 83, 0, 0, "\x0" "\x0" "34567890", 10, "");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 82, 4, 4, "1" "\x0" "\x0" "4567890", 10, "5678");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 23, 4, 4, "12" "\x0" "\x0" "567890", 10, "5678");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 821239, 4, 4, "123" "\x0" "\x0" "67890", 10, "\x0" "678");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 823739, 4, 4, "1234" "\x0" "\x0" "7890", 10, "\x0" "\x0" "78");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 82399, 4, 4, "12345" "\x0" "\x0" "890", 10, "5" "\x0" "\x0" "8");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 98239, 4, 4, "123456" "\x0" "\x0" "90", 10, "56" "\x0" "\x0");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 18239, 4, 4, "1234567" "\x0" "\x0" "0", 10, "567" "\x0");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 28239, 4, 4, "12345678" "\x0" "\x0", 10, "5678");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 38239, 4, 6, "12345678" "\x0" "\x0", 10, "78" "\x0" "\x0");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 48239, 3, 7, "12345678" "\x0" "\x0", 10, "8" "\x0" "\x0");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 58239, 2, 8, "12345678" "\x0" "\x0", 10, "\x0" "\x0");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 68239, 1, 9, "12345678" "\x0" "\x0", 10, "\x0");
-  TEST_FLOW_STATE_PKT_SLICE (ptr, 78239, 1, 9, "12345678" "\x0" "\x0", 10, "");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 10, 3, 0, "123", 3, "123");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 20, 4, 4, "1234567890", 10, "5678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 30, 4, 4, "\x0" "\x0" "34567890", 10, "5678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 40, 4, 0, "\x0" "\x0" "34567890", 10, "\x0" "\x0" "34");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 50, 3, 0, "\x0" "\x0" "34567890", 10, "\x0" "\x0" "3");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 60, 2, 0, "\x0" "\x0" "34567890", 10, "\x0" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 70, 1, 0, "\x0" "\x0" "34567890", 10, "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 80, 0, 0, "\x0" "\x0" "34567890", 10, "");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 90, 4, 4, "1" "\x0" "\x0" "4567890", 10, "5678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 100, 4, 4, "12" "\x0" "\x0" "567890", 10, "5678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 110, 4, 4, "123" "\x0" "\x0" "67890", 10, "\x0" "678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 120, 4, 4, "1234" "\x0" "\x0" "7890", 10, "\x0" "\x0" "78");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 130, 4, 4, "12345" "\x0" "\x0" "890", 10, "5" "\x0" "\x0" "8");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 140, 4, 4, "123456" "\x0" "\x0" "90", 10, "56" "\x0" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 150, 4, 4, "1234567" "\x0" "\x0" "0", 10, "567" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 160, 4, 4, "12345678" "\x0" "\x0", 10, "5678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 170, 4, 6, "12345678" "\x0" "\x0", 10, "78" "\x0" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 180, 3, 7, "12345678" "\x0" "\x0", 10, "8" "\x0" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 190, 2, 8, "12345678" "\x0" "\x0", 10, "\x0" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 200, 1, 9, "12345678" "\x0" "\x0", 10, "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 210, 1, 9, "12345678" "\x0" "\x0", 10, "");
   // clang-format on
-  
+  uint8_t buffer[1000000]; // 1M
+  uint32_t i = flow_state_assemble (ptr, buffer);
+  // clang-format off
+  int r = memcmp (buffer, "123""5678""5678""\x0" "\x0" "34""\x0" "\x0" "3""\x0" "\x0""\x0""""5678""5678""\x0" "678""\x0" "\x0" "78""5" "\x0" "\x0" "8""56" "\x0" "\x0""567" "\x0""5678""78" "\x0" "\x0""8" "\x0" "\x0""\x0" "\x0""\x0""", i);
+  // clang-format on
+  EXPECT_EQ_INT (0, r);
+  printf ("PAYLOAD: ");
+  print_hex (buffer, i);
+  printf ("PAYLOAD: ");
+  // clang-format off
+  print_hex ("123""5678""5678""\x0" "\x0" "34""\x0" "\x0" "3""\x0" "\x0""\x0""""5678""5678""\x0" "678""\x0" "\x0" "78""5" "\x0" "\x0" "8""56" "\x0" "\x0""567" "\x0""5678""78" "\x0" "\x0""8" "\x0" "\x0""\x0" "\x0""\x0""", i);
+  // clang-format on
+  flow_reset (ptr);
+}
+
+void
+test_flow_state_attach_retrans ()
+{
+  printf ("test_flow_state_attach_retrans\n");
+  flow_t flow;
+  flow_t *ptr = &flow;
+  flow_init (ptr, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+  // clang-format off
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 110, 4, 4, "123" "\x0" "\x0" "67890", 10, "\x0" "678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 100, 4, 4, "12" "\x0" "\x0" "567890", 10, "5678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 120, 4, 4, "1234" "\x0" "\x0" "7890", 10, "\x0" "\x0" "78");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 90, 4, 4, "1" "\x0" "\x0" "4567890", 10, "5678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 130, 4, 4, "12345" "\x0" "\x0" "890", 10, "5" "\x0" "\x0" "8");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 80, 0, 0, "\x0" "\x0" "34567890", 10, "");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 140, 4, 4, "123456" "\x0" "\x0" "90", 10, "56" "\x0" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 70, 1, 0, "\x0" "\x0" "34567890", 10, "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 150, 4, 4, "1234567" "\x0" "\x0" "0", 10, "567" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 10, 3, 0, "123", 3, "123");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 20, 4, 4, "1234567890", 10, "5678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 30, 4, 4, "\x0" "\x0" "34567890", 10, "5678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 40, 4, 0, "\x0" "\x0" "34567890", 10, "\x0" "\x0" "34");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 50, 3, 0, "\x0" "\x0" "34567890", 10, "\x0" "\x0" "3");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 60, 2, 0, "\x0" "\x0" "34567890", 10, "\x0" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 160, 4, 4, "12345678" "\x0" "\x0", 10, "5678");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 170, 4, 6, "12345678" "\x0" "\x0", 10, "78" "\x0" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 180, 3, 7, "12345678" "\x0" "\x0", 10, "8" "\x0" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 190, 2, 8, "12345678" "\x0" "\x0", 10, "\x0" "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 200, 1, 9, "12345678" "\x0" "\x0", 10, "\x0");
+  TEST_FLOW_STATE_PKT_SLICE (ptr, 210, 1, 9, "12345678" "\x0" "\x0", 10, "");
+  // clang-format on
+  uint8_t buffer[1000000]; // 1M
+  uint32_t i = flow_state_assemble (ptr, buffer);
+  // clang-format off
+  int r = memcmp (buffer, "123""5678""5678""\x0" "\x0" "34""\x0" "\x0" "3""\x0" "\x0""\x0""""5678""5678""\x0" "678""\x0" "\x0" "78""5" "\x0" "\x0" "8""56" "\x0" "\x0""567" "\x0""5678""78" "\x0" "\x0""8" "\x0" "\x0""\x0" "\x0""\x0""", i);
+  // clang-format on
+  EXPECT_EQ_INT (0, r);
+  printf ("PAYLOAD: ");
+  print_hex (buffer, i);
+  printf ("PAYLOAD: ");
+  // clang-format off
+  print_hex ("123""5678""5678""\x0" "\x0" "34""\x0" "\x0" "3""\x0" "\x0""\x0""""5678""5678""\x0" "678""\x0" "\x0" "78""5" "\x0" "\x0" "8""56" "\x0" "\x0""567" "\x0""5678""78" "\x0" "\x0""8" "\x0" "\x0""\x0" "\x0""\x0""", i);
+  // clang-format on
+  flow_reset (ptr);
 }
 
 #define CREATE_AND_ATTACH(ptr, seq, len, p)                             \
@@ -238,11 +295,58 @@ test_flow_state_attach ()
   EXPECT_EQ_BASE (ptr->next == NULL, NULL, ptr->next, "%p");
 }
 
+void
+test_flow_state_attach2 ()
+{
+  printf ("test_flow_state_attach2\n");
+  flow_t flow;
+  flow_t *ptr = &flow;
+  flow_init (ptr, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+
+  MAKE_STR_ARRAY (str, "123", "456", "7", "89", "0", "11");
+  MAKE_INT_ARRAY (len, sizeof ("123"), sizeof ("456"), sizeof ("7"), sizeof ("89"), sizeof ("0"), sizeof ("11"));
+
+  CREATE_AND_ATTACH (ptr, 3, 1, "7");
+  CREATE_AND_ATTACH (ptr, 0, 3, "456");
+  CREATE_AND_ATTACH (ptr, 4, 2, "89");
+  CREATE_AND_ATTACH (ptr, 6, 1, "0");
+  CREATE_AND_ATTACH (ptr, 0xfffffffd, 3, "123");
+  CREATE_AND_ATTACH (ptr, 7, 2, "11");
+  EXPECT_EQ_INT ((uint32_t) str_len, ptr->size);
+
+  flow_state_t *state = ptr->next;
+  for (int i = 0; i < str_len; i++)
+    {
+      int r = memcmp (str[i], state->pkt, len[i] - 1);
+      EXPECT_EQ_INT (0, r);
+      state = state->next;
+    }
+
+  /* printf ("  payload: "); */
+  /* flow_state_print (&flow); */
+
+  printf ("test_flow_state_pop2\n");
+  ptr->seg_nxt = 0xfffffffd;
+  TEST_DETACH_FLOW_STATE (ptr, 0xfffffffd, 3, "123");
+  TEST_DETACH_FLOW_STATE (ptr, 0, 3, "456");
+  TEST_DETACH_FLOW_STATE (ptr, 3, 1, "7");
+  TEST_DETACH_FLOW_STATE (ptr, 4, 2, "89");
+  TEST_DETACH_FLOW_STATE (ptr, 6, 1, "0");
+  TEST_DETACH_FLOW_STATE (ptr, 7, 2, "11");
+  EXPECT_EQ_INT (ptr->seg_nxt, 9);
+  EXPECT_EQ_INT (0, ptr->size);
+
+  // printf ("  payload: ");
+  // flow_state_print (ptr);
+  EXPECT_EQ_BASE (ptr->next == NULL, NULL, ptr->next, "%p");
+}
+
 const char *test[] = { "test1", "Hello", "WORLD!", "\x1b", "*2A", NULL };
 
 void
 test_contain ()
 {
+  printf ("test_contain\n");
   EXPECT_EQ_INT (contain ("test", 4, test), 1);
   EXPECT_EQ_INT (contain ("test1", 5, test), 1);
   EXPECT_EQ_INT (contain ("\x1b", 1, test), 1);
@@ -281,14 +385,90 @@ test_detect ()
   flow_reset (ptr);
 }
 
+#define TEST_CAL(sn, seq, sp_act, op_act, exp, sp_exp, op_exp) \
+  do                                                           \
+    {                                                          \
+      uint32_t e = seq + sp_act;                               \
+      if (SEQ_LEQ (e, sn))                                     \
+        {                                                      \
+          EXPECT_EQ_INT (exp, 1);                              \
+        }                                                      \
+      else if (SEQ_LT (seq, sn) && SEQ_GT (e, sn))             \
+        {                                                      \
+          EXPECT_EQ_INT (exp, 2);                              \
+          EXPECT_EQ_INT (sp_exp, e - sn);                      \
+          EXPECT_EQ_INT (op_exp, op_act + sn - seq);           \
+        }                                                      \
+      else                                                     \
+        {                                                      \
+          EXPECT_EQ_INT (exp, 0);                              \
+        }                                                      \
+    }                                                          \
+  while (0)
+
+void
+test_cal ()
+{
+  printf ("test_cal\n");
+  TEST_CAL (1, 1, 1600, 1600, 0, 123, 123);
+  TEST_CAL (1, 2, 1600, 1600, 0, 123, 123);
+
+  TEST_CAL (1000, 100, 600, 100, 1, 1500, 1700);
+  TEST_CAL (1000, 100, 600, 200, 1, 1500, 1700);
+  TEST_CAL (1000, 100, 600, 300, 1, 1500, 1700);
+  TEST_CAL (1000, 100, 600, 400, 1, 1500, 1700);
+  TEST_CAL (1000, 100, 600, 500, 1, 1500, 1700);
+  TEST_CAL (1000, 100, 600, 600, 1, 1500, 1700);
+  TEST_CAL (1000, 100, 600, 700, 1, 1500, 1700);
+
+  TEST_CAL (1000, 100, 600, 500, 1, 1500, 1700);
+  TEST_CAL (1000, 100, 700, 500, 1, 1500, 1700);
+  TEST_CAL (1000, 100, 800, 500, 1, 1500, 1700);
+  TEST_CAL (1000, 100, 900, 500, 1, 1, 500);
+  TEST_CAL (1000, 100, 1000, 500, 2, 100, 1400);
+  TEST_CAL (1000, 100, 1100, 500, 2, 200, 1400);
+  TEST_CAL (1000, 100, 1200, 500, 2, 300, 1400);
+
+  TEST_CAL (700, 900, 1600, 1600, 0, 1500, 1700);
+  TEST_CAL (800, 900, 1600, 1600, 0, 1500, 1700);
+  TEST_CAL (900, 900, 1600, 1600, 0, 1500, 1700);
+  TEST_CAL (1000, 900, 1600, 1600, 2, 1500, 1700);
+  TEST_CAL (1100, 900, 1600, 1600, 2, 1400, 1800);
+  TEST_CAL (1200, 900, 1600, 1600, 2, 1300, 1900);
+
+  TEST_CAL (0xffffffff, 1, 3, 100, 0, 1500, 1700);
+  TEST_CAL (0xffffffff, 0, 3, 100, 0, 1500, 1700);
+  TEST_CAL (0xffffffff, 0xffffffff, 3, 100, 0, 1500, 1700);
+  TEST_CAL (0xffffffff, 0xfffffffe, 3, 100, 2, 2, 101);
+  TEST_CAL (0xffffffff, 0xfffffffd, 3, 100, 2, 1, 102);
+  TEST_CAL (0xffffffff, 0xfffffffc, 3, 100, 1, 1500, 1700);
+
+  TEST_CAL (3, 0, 3, 100, 1, 1, 102);
+  TEST_CAL (2, 0, 3, 100, 2, 1, 102);
+  TEST_CAL (1, 0, 3, 100, 2, 2, 101);
+  TEST_CAL (0, 0, 3, 100, 0, 1500, 1700);
+  TEST_CAL (0xffffffff, 0, 3, 100, 0, 1500, 1700);
+
+  TEST_CAL (2, 0xffffffff, 3, 100, 1, 1, 102);
+  TEST_CAL (1, 0xffffffff, 3, 100, 2, 1, 102);
+  TEST_CAL (0, 0xffffffff, 3, 100, 2, 2, 101);
+  TEST_CAL (0xffffffff, 0xffffffff, 3, 100, 0, 1500, 1700);
+  TEST_CAL (0xfffffffe, 0xffffffff, 3, 100, 0, 1500, 1700);
+  TEST_CAL (0xfffffffd, 0xffffffff, 3, 100, 0, 1500, 1700);
+}
+
 int
 main (int argc, char *argv[])
 {
   test_flow_state_attach ();
+  test_flow_state_attach2 ();
   test_flow_state_pkt_slice ();
   test_flow_state_attach_partially ();
+  test_flow_state_attach_retrans ();
   test_contain ();
   test_detect ();
+  test_cal ();
+
   printf ("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
   return main_ret;
 }

@@ -41,7 +41,7 @@ flow_state_t *flow_state_attach (flow_t *flow, flow_state_t *new_flow_state);
 flow_state_t *flow_state_detach (flow_t *flow, flow_state_t *new_flow_state);
 flow_state_t *flow_state_pop (flow_t *flow);
 
-void flow_state_assemble (flow_t *flow);
+uint32_t flow_state_assemble (flow_t *flow, uint8_t *buffer);
 void flow_state_print (flow_t *flow);
 void flow_state_free (flow_state_t *fs);
 
