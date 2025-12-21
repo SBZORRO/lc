@@ -169,8 +169,8 @@ flow_state_t *
 flow_state_pop (flow_t *flow)
 {
   pthread_mutex_lock (&flow->mutex);
-
   flow_state_t *state = flow->next;
+  log_debug ("pop: %p", state);
   if (flow->seg_nxt >= state->seq)
     {
       flow->seg_nxt += state->size_payload;
@@ -178,27 +178,8 @@ flow_state_pop (flow_t *flow)
   flow->next = state->next;
   flow->size--;
 
-        uint32_t e = seq + size_payload; // [s, e)
-      // outside of window
-      if (SEQ_LEQ (e, flow->seg_nxt))
-        {
-          log_debug ("DISCARD");
-          free (p);
-          continue;
-        }
-      else if (SEQ_LT (seq, flow->seg_nxt) && SEQ_GT (e, flow->seg_nxt)) // overlap
-        {
-          // s < r < e
-          // 左半段是重复数据，右半段是新数据
-          // 需要把 [s, r) 裁掉，只保留 [r, e)
-          size_payload = e - flow->seg_nxt;
-          offset_payload = offset_payload + flow->seg_nxt - seq;
-          // 调整指针和长度：payload += (r - s); len = new_len;
-        }
-  
-
   pthread_mutex_unlock (&flow->mutex);
-  return flow->next;
+  return state;
 }
 
 flow_state_t *
@@ -237,7 +218,7 @@ flow_state_t *
 flow_state_attach (flow_t *flow, flow_state_t *state)
 {
   pthread_mutex_lock (&flow->mutex);
-
+  log_debug ("attach: %p", state);
   u_int seq = state->seq;
   clock_gettime (CLOCK_REALTIME, &flow->ts);
   if (flow->next == NULL)
@@ -365,6 +346,7 @@ flow_state_assemble (flow_t *flow, uint8_t *buffer)
 void
 flow_state_free (flow_state_t *fs)
 {
+  log_debug ("free: %p", fs);
   if (fs == NULL)
     return;
   fs->next = NULL;

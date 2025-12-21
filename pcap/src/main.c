@@ -58,6 +58,7 @@ th_send_flow (void *f)
           sleep (1);
           continue;
         }
+
       rst = 0;
 
       uint32_t e = state->seq + state->size_payload; // [s, e)
@@ -65,6 +66,7 @@ th_send_flow (void *f)
       if (SEQ_LEQ (e, flow->seg_nxt))
         {
           log_debug ("DISCARD");
+          flow->next = state->next;
           flow_state_free (state);
           continue;
         }
@@ -89,7 +91,7 @@ th_send_flow (void *f)
       /*   } */
 
       state = flow_state_pop (flow);
-      log_debug ("sending: \n%s", state->pkt);
+      log_debug ("sending: %p", state);
       // do_sent (flow, (char *) state->pkt + state->offset_payload, (size_t) state->len);
 
       /* write the data into the file */
@@ -210,15 +212,15 @@ th_dispatch_flow (void *arg)
           free (p);
           continue;
         }
-      else if (SEQ_LT (seq, flow->seg_nxt) && SEQ_GT (e, flow->seg_nxt)) // overlap
-        {
-          // s < r < e
-          // 左半段是重复数据，右半段是新数据
-          // 需要把 [s, r) 裁掉，只保留 [r, e)
-          size_payload = e - flow->seg_nxt;
-          offset_payload = offset_payload + flow->seg_nxt - seq;
-          // 调整指针和长度：payload += (r - s); len = new_len;
-        }
+      /* else if (SEQ_LT (seq, flow->seg_nxt) && SEQ_GT (e, flow->seg_nxt)) // overlap */
+      /*   { */
+      /*     // s < r < e */
+      /*     // 左半段是重复数据，右半段是新数据 */
+      /*     // 需要把 [s, r) 裁掉，只保留 [r, e) */
+      /*     size_payload = e - flow->seg_nxt; */
+      /*     offset_payload = offset_payload + flow->seg_nxt - seq; */
+      /*     // 调整指针和长度：payload += (r - s); len = new_len; */
+      /*   } */
 
       flow_state_t *state = flow_state_create (flow, seq, ack, tcp->th_flags, size_payload, offset_payload, p);
       flow_state_attach (flow, state);
@@ -269,6 +271,7 @@ main (int argc, char *argv[])
 
   // block
   filter_exp = argv[1];
+  log_debug ("filter_exp: %s", filter_exp);
   loop (filter_exp);
 
   pthread_exit (NULL);
