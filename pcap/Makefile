@@ -1,7 +1,7 @@
 CC := gcc
 
-CFLAGS := -Wall -I../src
-# CFLAGS := -Wall -fsanitize=address,undefined -fno-omit-frame-pointer -I../src
+# CFLAGS := -Wall -I../src
+CFLAGS := -Wall -fsanitize=address,undefined -fno-omit-frame-pointer -I../src
 
 SRC := ./src
 BLD := ./build

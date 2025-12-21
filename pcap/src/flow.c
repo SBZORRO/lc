@@ -70,10 +70,10 @@ flow_init (flow_t *flow,
   flow->port_tar = 0;
 
   flow->next = NULL;
-  struct timespec ts = { 0 };
+  flow->ts = (struct timespec) { 0 };
   flow->flags = 0;
-  flow->sock = 0;
-  FILE *fp = NULL;
+  flow->sock = -1;
+  flow->fp = NULL;
   flow->size = 0;
   flow->seg_nxt = 0;
 
@@ -107,10 +107,14 @@ flow_reset (flow_t *flow)
   flow->port_tar = 0;
 
   flow->next = NULL;
-  struct timespec ts = { 0 };
+  flow->ts = (struct timespec) { 0 };
   flow->flags = 0;
-  flow->sock = 0;
-  FILE *fp = NULL;
+  flow->sock = -1;
+  if (flow->fp)
+    {
+      fclose (flow->fp);
+      flow->fp = NULL;
+    }
   flow->size = 0;
   flow->seg_nxt = 0;
 

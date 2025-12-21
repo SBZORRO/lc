@@ -58,9 +58,7 @@ th_send_flow (void *f)
           sleep (1);
           continue;
         }
-
       rst = 0;
-
       uint32_t e = state->seq + state->size_payload; // [s, e)
       // outside of window
       if (SEQ_LEQ (e, flow->seg_nxt))
