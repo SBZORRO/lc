@@ -32,7 +32,6 @@ int do_connect (struct in_addr sin_addr, u_short sin_port);
 
 /* pcapimpl.c */
 int loop (char *filter_exp);
-char *get_if ();
 void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
 
 /* flow.c */

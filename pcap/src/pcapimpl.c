@@ -17,16 +17,28 @@ extern spsc_queue *pkt_que;
 int
 loop (char *filter_exp)
 {
+  pcap_handler handler = dl_ethernet;
+  char errbuf[PCAP_ERRBUF_SIZE];
   struct bpf_program fp; /* The compiled filter expression */
   bpf_u_int32 mask;      /* The netmask of our sniffing device */
   bpf_u_int32 net;       /* The IP of our sniffing device */
-
-  pcap_handler handler = dl_ethernet;
-
   pcap_t *pt;
-  char errbuf[PCAP_ERRBUF_SIZE];
+  pcap_if_t *pit[1];
+  char *dev;
 
-  pt = pcap_open_live (get_if (), bufsize, 1, 1000, errbuf);
+  if (pcap_findalldevs (pit, errbuf) == -1)
+    {
+      fprintf (stderr, "Couldn't find default device: %s\n", errbuf);
+      return (2);
+    }
+  dev = (pit[0])->name;
+  if (pcap_lookupnet (dev, &net, &mask, errbuf) == -1)
+    {
+      fprintf (stderr, "Couldn't get netmask for device %s: %s\n", dev, errbuf);
+      net = 0;
+      mask = 0;
+    }
+  pt = pcap_open_live (dev, bufsize, 1, 1000, errbuf);
   if (pt == NULL)
     {
       fprintf (stderr, "Could't open D %s: \n", errbuf);
@@ -48,16 +60,6 @@ loop (char *filter_exp)
   log_debug ("LOOPPING");
   pcap_loop (pt, -1, handler, NULL);
   return 0;
-}
-
-char *
-get_if ()
-{
-  char buf[PCAP_ERRBUF_SIZE];
-  pcap_if_t *pit[1];
-  int res = pcap_findalldevs (pit, buf);
-  log_debug ("pit: %s\n", (pit[0])->name);
-  return (pit[0])->name;
 }
 
 void

@@ -116,17 +116,17 @@ th_dispatch_flow (void *arg)
           continue;
         }
 
-      const struct sniff_ethernet *ethernet; /* The ethernet header */
-      const struct sniff_ip *ip;             /* The IP header */
-      const struct sniff_tcp *tcp;           /* The TCP header */
-      uint8_t *payload;                      /* Packet payload */
+      /* const struct sniff_ethernet *ethernet; /\* The ethernet header *\/ */
+      const struct sniff_ip *ip;   /* The IP header */
+      const struct sniff_tcp *tcp; /* The TCP header */
+      uint8_t *payload;            /* Packet payload */
 
       uint32_t size_ip;
       uint32_t size_tcp;
       uint32_t size_payload;
       uint32_t offset_payload;
 
-      ethernet = (struct sniff_ethernet *) (p);
+      /* ethernet = (struct sniff_ethernet *) (p); */
       /* Process IP */
       ip = (struct sniff_ip *) (p + SIZE_ETHERNET);
       size_ip = IP_HL (ip) * 4;

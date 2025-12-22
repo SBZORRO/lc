@@ -136,7 +136,7 @@ flow_flags (flow_t *flow, uint32_t th_flags)
   u_int thread_bits = flow->flags & THREAD_MASK;
   u_int tcp_bits = flow->flags & TCP_MASK;
 
-  // receieve RST
+  // receive RST
   if (th_flags & TH_RST)
     {
       flow_reset (flow);
