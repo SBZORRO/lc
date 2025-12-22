@@ -126,6 +126,47 @@ flow_reset (flow_t *flow)
   /* pthread_mutexattr_destroy (&attr); */
 }
 
+int
+flow_flags (flow_t *flow, uint32_t th_flags)
+{
+  // 保留线程状态位
+  const u_int THREAD_MASK = SENDING;
+  const u_int TCP_MASK = 0xFF; // TH_* 都在低 8 位
+
+  u_int thread_bits = flow->flags & THREAD_MASK;
+  u_int tcp_bits = flow->flags & TCP_MASK;
+
+  // receieve RST
+  if (th_flags & TH_RST)
+    {
+      flow_reset (flow);
+      tcp_bits = TH_RST; // reset tcp bits
+      flow->flags = thread_bits | tcp_bits;
+      return 0;
+    }
+
+  // receieve SYN
+  if (th_flags & TH_SYN)
+    {
+      tcp_bits &= ~TH_RST; // unset rst flag
+      tcp_bits |= th_flags;
+      flow->flags = thread_bits | tcp_bits;
+      return 1; // init seg_nxt seq
+    }
+
+  // 丢包直到 SYN
+  if (tcp_bits & TH_RST)
+    {
+      flow->flags = thread_bits | tcp_bits;
+      return 0;
+    }
+
+  tcp_bits |= th_flags;
+  flow->flags = thread_bits | tcp_bits;
+
+  return flow->flags;
+}
+
 flow_t *
 flow_set_dst (flow_t *flow, char *dst_addr)
 {
@@ -158,39 +199,40 @@ flow_set_src (flow_t *flow, char *src_addr)
   return flow;
 }
 
-void
-flow_state_detach_before (flow_t *flow, flow_state_t *cur)
-{
-  flow_state_t *ptr = flow->next;
-  while (ptr != cur)
-    {
-      flow_state_pop (flow);
-      ptr = ptr->next;
-    }
-}
-
 flow_state_t *
-flow_state_pop (flow_t *flow)
+flow_state_fix_and_pop (flow_t *flow)
 {
-  pthread_mutex_lock (&flow->mutex);
   flow_state_t *state = flow->next;
   log_debug ("pop: %p", state);
-  if (flow->seg_nxt >= state->seq)
+  if (state == NULL || SEQ_LT (flow->seg_nxt, state->seq))
     {
-      flow->seg_nxt += state->size_payload;
+      return NULL;
     }
+  uint32_t e = state->seq + state->size_payload;
+  // outside of window
+  if (SEQ_LEQ (e, flow->seg_nxt))
+    {
+      log_debug ("DISCARD");
+      flow->next = state->next;
+      flow->size--;
+      flow_state_free (state);
+      return NULL;
+    }
+  if (SEQ_LT (state->seq, flow->seg_nxt) && SEQ_GT (e, flow->seg_nxt)) // overlap
+    {
+      state->size_payload = e - flow->seg_nxt;
+      state->offset_payload = state->offset_payload + flow->seg_nxt - state->seq;
+    }
+
+  flow->seg_nxt += state->size_payload;
   flow->next = state->next;
   flow->size--;
-
-  pthread_mutex_unlock (&flow->mutex);
   return state;
 }
 
 flow_state_t *
 flow_state_detach (flow_t *flow, flow_state_t *state)
 {
-  pthread_mutex_lock (&flow->mutex);
-
   if (state == NULL || flow->next == NULL)
     {
       return NULL;
@@ -199,7 +241,7 @@ flow_state_detach (flow_t *flow, flow_state_t *state)
   flow_state_t *ptr = flow->next;
   if (ptr == state)
     {
-      return flow_state_pop (flow);
+      return flow_state_fix_and_pop (flow);
     }
 
   while (ptr->next != state)
@@ -214,7 +256,6 @@ flow_state_detach (flow_t *flow, flow_state_t *state)
   ptr->next = state->next;
   flow->size--;
 
-  pthread_mutex_unlock (&flow->mutex);
   return ptr->next;
 }
 

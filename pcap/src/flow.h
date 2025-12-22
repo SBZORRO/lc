@@ -39,7 +39,7 @@ void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
 flow_state_t *flow_state_create (flow_t *flow, u_int seq, u_int ack, u_int flags, u_int size_payload, u_int offset_payload, u_char *pkt);
 flow_state_t *flow_state_attach (flow_t *flow, flow_state_t *new_flow_state);
 flow_state_t *flow_state_detach (flow_t *flow, flow_state_t *new_flow_state);
-flow_state_t *flow_state_pop (flow_t *flow);
+flow_state_t *flow_state_fix_and_pop (flow_t *flow);
 
 uint32_t flow_state_assemble (flow_t *flow, uint8_t *buffer);
 void flow_state_print (flow_t *flow);
@@ -51,6 +51,7 @@ flow_t *flow_set_src (flow_t *flow, char *src_addr);
 void flow_reset (flow_t *flow);
 flow_t *flow_init (flow_t *flow, const struct in_addr src, const struct in_addr dst, const u_short sport, const u_short dport);
 flow_t *flow_find (flow_arr_t *fa, struct in_addr src, struct in_addr dst, u_short sport, u_short dport);
+int flow_flags (flow_t *flow, uint32_t th_flags);
 
 flow_arr_t *flow_arr_init (uint32_t size);
 flow_arr_t *flow_arr_add (flow_arr_t *flow);

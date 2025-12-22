@@ -47,8 +47,11 @@ th_send_flow (void *f)
   int rst = 0;
   while (1)
     {
-      flow_state_t *state = flow->next;
-      if (state == NULL || SEQ_LT (flow->seg_nxt, state->seq))
+      pthread_mutex_lock (&flow->mutex);
+      flow_state_t *state = flow_state_fix_and_pop (flow);
+      pthread_mutex_unlock (&flow->mutex);
+
+      if (state == NULL)
         {
           if (rst++ > 60)
             {
@@ -59,20 +62,6 @@ th_send_flow (void *f)
           continue;
         }
       rst = 0;
-      uint32_t e = state->seq + state->size_payload; // [s, e)
-      // outside of window
-      if (SEQ_LEQ (e, flow->seg_nxt))
-        {
-          log_debug ("DISCARD");
-          flow->next = state->next;
-          flow_state_free (state);
-          continue;
-        }
-      else if (SEQ_LT (state->seq, flow->seg_nxt) && SEQ_GT (e, flow->seg_nxt)) // overlap
-        {
-          state->size_payload = e - flow->seg_nxt;
-          state->offset_payload = state->offset_payload + flow->seg_nxt - state->seq;
-        }
 
       /* if (flow->sock == 0) */
       /*   { */
@@ -88,7 +77,6 @@ th_send_flow (void *f)
       /*       } */
       /*   } */
 
-      state = flow_state_pop (flow);
       log_debug ("sending: %p", state);
       // do_sent (flow, (char *) state->pkt + state->offset_payload, (size_t) state->len);
 
@@ -99,6 +87,7 @@ th_send_flow (void *f)
           perror ("");
         }
       fflush (flow->fp);
+
       flow_state_free (state);
     }
 
@@ -127,18 +116,15 @@ th_dispatch_flow (void *arg)
           continue;
         }
 
-      // 在这里使用 pkt（里面是完整的包数据）
-      // parse_packet(pkt, ...);
-
       const struct sniff_ethernet *ethernet; /* The ethernet header */
       const struct sniff_ip *ip;             /* The IP header */
       const struct sniff_tcp *tcp;           /* The TCP header */
-      u_char *payload;                       /* Packet payload */
+      uint8_t *payload;                      /* Packet payload */
 
-      u_int size_ip;
-      u_int size_tcp;
-      u_int size_payload;
-      u_int offset_payload;
+      uint32_t size_ip;
+      uint32_t size_tcp;
+      uint32_t size_payload;
+      uint32_t offset_payload;
 
       ethernet = (struct sniff_ethernet *) (p);
       /* Process IP */
@@ -160,14 +146,16 @@ th_dispatch_flow (void *arg)
           continue;
         }
       /* Process Payload */
-      u_int seq = ntohl (tcp->th_seq);
-      u_int ack = ntohl (tcp->th_ack);
+      uint32_t seq = ntohl (tcp->th_seq);
+      uint32_t ack = ntohl (tcp->th_ack);
+      uint32_t flags = tcp->th_flags;
       size_payload = ntohs (ip->ip_len) - (size_ip + size_tcp);
       offset_payload = SIZE_ETHERNET + size_ip + size_tcp;
       payload = (u_char *) (p + offset_payload);
 
       /* Reassemble TCP */
       flow_t *flow = flow_find (flow_ptr, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
+      // add new flow
       if (flow == NULL)
         {
           flow_ptr = flow_arr_add (flow_ptr);
@@ -175,32 +163,27 @@ th_dispatch_flow (void *arg)
           flow_init (flow, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
         }
 
-      switch (tcp->th_flags)
+      // handle RST/SYN flags
+      int res = flow_flags (flow, flags);
+      if (res == 0)
         {
-        case TH_RST:
-          flow_reset (flow);
-          flow->flags = TH_RST;
           free (p);
           continue;
-          break;
-        case TH_SYN:
-          flow->flags = TH_SYN;
-        default:
-          // rst, discard following untill syn
-          if (flow->flags & TH_RST)
-            {
-              free (p);
-              continue;
-            }
-          if (flow->flags == 0)
-            {
-              flow->seg_nxt = seq;
-            }
-          flow->flags = flow->flags | tcp->th_flags;
-          break;
+        }
+      else if (res == 1)
+        {
+          flow->seg_nxt = seq + 1; // SYN consumes one
+        }
+      else if (flow->seg_nxt == 0)
+        {
+          flow->seg_nxt = seq;
         }
 
-      log_debug ("dequeued: \n%.*s", size_payload, payload);
+      if (size_payload == 0)
+        {
+          free (p);
+          continue;
+        }
 
       uint32_t e = seq + size_payload; // [s, e)
       // outside of window
@@ -210,17 +193,10 @@ th_dispatch_flow (void *arg)
           free (p);
           continue;
         }
-      /* else if (SEQ_LT (seq, flow->seg_nxt) && SEQ_GT (e, flow->seg_nxt)) // overlap */
-      /*   { */
-      /*     // s < r < e */
-      /*     // 左半段是重复数据，右半段是新数据 */
-      /*     // 需要把 [s, r) 裁掉，只保留 [r, e) */
-      /*     size_payload = e - flow->seg_nxt; */
-      /*     offset_payload = offset_payload + flow->seg_nxt - seq; */
-      /*     // 调整指针和长度：payload += (r - s); len = new_len; */
-      /*   } */
 
-      flow_state_t *state = flow_state_create (flow, seq, ack, tcp->th_flags, size_payload, offset_payload, p);
+      log_debug ("dequeued: \n%.*s", size_payload, payload);
+
+      flow_state_t *state = flow_state_create (flow, seq, ack, flags, size_payload, offset_payload, p);
       flow_state_attach (flow, state);
 
       if (!(flow->flags & SENDING))
@@ -229,8 +205,8 @@ th_dispatch_flow (void *arg)
           if (flow->fp == NULL)
             {
               flow->fp = fopen (name, "ab");
-              flow->flags = flow->flags | SENDING;
             }
+          flow->flags = flow->flags | SENDING;
           pthread_create (&flow->thread, NULL, th_send_flow, (void *) flow);
           // int rc = pthread_setname_np (pthread_self (), name);
         }

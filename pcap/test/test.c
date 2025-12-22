@@ -235,18 +235,21 @@ test_flow_state_attach_retrans ()
     }                                                                   \
   while (0)
 
-#define TEST_DETACH_FLOW_STATE(ptr, sq, sp, pl) \
-  do                                            \
-    {                                           \
-      flow_state_t *state = ptr->next;          \
-      flow_state_detach (ptr, state);           \
-      EXPECT_EQ_PTR (ptr, state->flow);         \
-      EXPECT_EQ_INT (sq, state->seq);           \
-      EXPECT_EQ_INT (sp, state->size_payload);  \
-      EXPECT_EQ_STRING (pl, state->pkt, sp);    \
-      flow_state_free (state);                  \
-      state = NULL;                             \
-    }                                           \
+#define TEST_DETACH_FLOW_STATE(ptr, sq, sp, pl)          \
+  do                                                     \
+    {                                                    \
+      flow_state_t *state = ptr->next;                   \
+      flow_state_t *st = flow_state_detach (ptr, state); \
+      EXPECT_EQ_PTR (ptr, state->flow);                  \
+      EXPECT_EQ_INT (sq, state->seq);                    \
+      EXPECT_EQ_INT (sp, state->size_payload);           \
+      if (st != NULL)                                    \
+        {                                                \
+          EXPECT_EQ_STRING (pl, state->pkt, sp);         \
+          flow_state_free (state);                       \
+        }                                                \
+      state = NULL;                                      \
+    }                                                    \
   while (0)
 
 void
@@ -283,15 +286,26 @@ test_flow_state_attach ()
   ptr->seg_nxt = 123;
   TEST_DETACH_FLOW_STATE (ptr, 123, 3, "123");
   TEST_DETACH_FLOW_STATE (ptr, 154, 1, " ");
-  TEST_DETACH_FLOW_STATE (ptr, 321, 9, "abger0[g]");
-  TEST_DETACH_FLOW_STATE (ptr, 983, 3, "123");
-  TEST_DETACH_FLOW_STATE (ptr, 298346, 7, "       ");
-  TEST_DETACH_FLOW_STATE (ptr, 921034, 7, "1234567");
+  TEST_DETACH_FLOW_STATE (ptr, 154, 1, "abger0[g]");
+  TEST_DETACH_FLOW_STATE (ptr, 154, 1, "123");
+  TEST_DETACH_FLOW_STATE (ptr, 154, 1, "       ");
+  TEST_DETACH_FLOW_STATE (ptr, 154, 1, "1234567");
   EXPECT_EQ_INT (ptr->seg_nxt, 123 + 3);
-  EXPECT_EQ_INT (0, ptr->size);
+  EXPECT_EQ_INT (str_len - 1, ptr->size);
 
   // printf ("  payload: ");
   // flow_state_print (ptr);
+  ptr->seg_nxt = 154;
+  TEST_DETACH_FLOW_STATE (ptr, 154, 1, " ");
+  ptr->seg_nxt = 321;
+  TEST_DETACH_FLOW_STATE (ptr, 321, 9, "abger0[g]");
+  ptr->seg_nxt = 983;
+  TEST_DETACH_FLOW_STATE (ptr, 983, 3, "123");
+  ptr->seg_nxt = 298346;
+  TEST_DETACH_FLOW_STATE (ptr, 298346, 7, "       ");
+  ptr->seg_nxt = 921034;
+  TEST_DETACH_FLOW_STATE (ptr, 921034, 7, "1234567");
+  EXPECT_EQ_INT (0, ptr->size);
   EXPECT_EQ_BASE (ptr->next == NULL, NULL, ptr->next, "%p");
 }
 
@@ -457,6 +471,31 @@ test_cal ()
   TEST_CAL (0xfffffffd, 0xffffffff, 3, 100, 0, 1500, 1700);
 }
 
+void
+test_flow_flags ()
+{
+  printf ("test_detect\n");
+
+  flow_t flow;
+  flow_t *ptr = &flow;
+  flow_init (ptr, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+
+  ptr->flags |= TH_PUSH;
+  EXPECT_EQ_INT (TH_PUSH | TH_ACK, flow_flags (ptr, TH_ACK));
+  EXPECT_EQ_INT (TH_PUSH | TH_ACK | TH_CWR, flow_flags (ptr, TH_CWR));
+  EXPECT_EQ_INT (TH_PUSH | TH_ACK | TH_CWR, flow_flags (ptr, TH_ACK));
+
+  EXPECT_EQ_INT (0, flow_flags (ptr, TH_RST));
+  EXPECT_EQ_INT (0, flow_flags (ptr, TH_ACK));
+  EXPECT_EQ_INT (0, flow_flags (ptr, TH_CWR));
+  EXPECT_EQ_INT (0, flow_flags (ptr, TH_ACK));
+
+  EXPECT_EQ_INT (1, flow_flags (ptr, TH_SYN));
+  EXPECT_EQ_INT (TH_SYN | TH_ACK, flow_flags (ptr, TH_ACK));
+  EXPECT_EQ_INT (TH_SYN | TH_ACK | TH_CWR, flow_flags (ptr, TH_CWR));
+  EXPECT_EQ_INT (TH_SYN | TH_ACK | TH_CWR | TH_URG, flow_flags (ptr, TH_ACK | TH_URG));
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -468,6 +507,7 @@ main (int argc, char *argv[])
   test_contain ();
   test_detect ();
   test_cal ();
+  test_flow_flags ();
 
   printf ("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
   return main_ret;
