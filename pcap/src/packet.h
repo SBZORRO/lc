@@ -84,12 +84,12 @@ struct flow_state_struct
 {
   flow_state_t *next; /* Link to next one */
   flow_t *flow;       /* Description of this flow */
-  u_char *pkt;        /* pcap capture */
-  u_int seq;
-  u_int ack;
-  u_int flags;
-  u_int size_payload;
-  u_int offset_payload;
+  uint8_t *pkt;       /* pcap capture */
+  uint32_t seq;
+  uint32_t ack;
+  uint32_t flags;
+  uint32_t size_payload;
+  uint32_t offset_payload;
 };
 
 struct flow_struct
@@ -98,19 +98,19 @@ struct flow_struct
   struct timespec ts;    // last segment ts
   pthread_t thread;      // thread to process flow
   pthread_mutex_t mutex; // attach/detach mutex
-  u_int flags;           // tcp flags/thread state
+  uint32_t flags;        // tcp flags/thread state
 #define SENDING 0x8000
-  u_int sock;    // fd/socket to send
-  FILE *fp;      // Pointer to file storing this flow's data
-  u_int size;    // total flow_state
-  u_int seg_nxt; // expect byt
+  int sock;         // fd/socket to send
+  FILE *fp;         // Pointer to file storing this flow's data
+  uint32_t size;    // total flow_state
+  uint32_t seg_nxt; // expect byt
   struct in_addr
     ip_src,
     ip_dst,
-    ip_tar;         // pcap src and dst, server to send
-  u_short port_src; /* Source port number */
-  u_short port_dst; /* Destination port number */
-  u_short port_tar; /* target server port number */
+    ip_tar;          // pcap src and dst, server to send
+  uint16_t port_src; /* Source port number */
+  uint16_t port_dst; /* Destination port number */
+  uint16_t port_tar; /* target server port number */
 };
 
 struct flow_array_struct

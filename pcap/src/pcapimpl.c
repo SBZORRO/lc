@@ -10,7 +10,7 @@
 #include "log.c/log.h"
 #include "spsc_queue.h"
 
-unsigned int bufsize = 1024 * 1024 * 1024;
+int bufsize = 1024 * 1024 * 1024;
 
 extern spsc_queue *pkt_que;
 

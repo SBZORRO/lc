@@ -5,6 +5,8 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -14,7 +16,7 @@
 #include "src/packet.h"
 
 void
-do_sent (flow_t *flow, char *msg, int len)
+do_sent (flow_t *flow, char *msg, size_t len)
 {
   while (send (flow->sock, msg, len, MSG_NOSIGNAL) < 0)
     {
@@ -53,6 +55,11 @@ do_connect (struct in_addr ip, u_short port)
 
   if (connect (sock, (struct sockaddr *) &serv_addr, sizeof (serv_addr)) < 0)
     {
+      if (close (sock) < 0)
+        {
+          perror ("Close sock failed");
+        }
+      sock = -1; // 防止后续误用/重复 close
       perror ("Connection failed");
       return (EXIT_FAILURE);
     }

@@ -44,7 +44,7 @@ flow_find (flow_arr_t *fa,
            const struct in_addr src, const struct in_addr dst,
            const u_short sport, const u_short dport)
 {
-  for (int i = 0; i < fa->flow_len; i++)
+  for (uint32_t i = 0; i < fa->flow_len; i++)
     {
       if (fa->flow[i].ip_src.s_addr == src.s_addr
           && fa->flow[i].port_src == sport
@@ -126,7 +126,7 @@ flow_reset (flow_t *flow)
   /* pthread_mutexattr_destroy (&attr); */
 }
 
-int
+uint32_t
 flow_flags (flow_t *flow, uint32_t th_flags)
 {
   // 保留线程状态位
@@ -173,12 +173,13 @@ flow_set_dst (flow_t *flow, char *dst_addr)
   if (dst_addr != NULL)
     {
       char *dst = strdup (dst_addr);
+      char *d = dst;
       char *dst_ip = strsep (&dst, ":");
       char *dst_port = strsep (&dst, ":");
       /* flow->ip_dst.s_addr = inet_addr (dst_ip); */
       inet_aton (dst_ip, &flow->ip_dst);
-      flow->port_dst = htons (atoi (dst_port));
-      free (dst);
+      flow->port_dst = htons ((uint16_t) atoi (dst_port));
+      free (d);
     }
   return flow;
 }
@@ -189,12 +190,13 @@ flow_set_src (flow_t *flow, char *src_addr)
   if (src_addr != NULL)
     {
       char *src = strdup (src_addr);
+      char *s = src;
       char *src_ip = strsep (&src, ":");
       char *src_port = strsep (&src, ":");
       /* flow->ip_dst.s_addr = inet_addr (dst_ip); */
       inet_aton (src_ip, &flow->ip_src);
-      flow->port_src = htons (atoi (src_port));
-      free (src);
+      flow->port_src = htons ((uint16_t) atoi (src_port));
+      free (s);
     }
   return flow;
 }
@@ -341,9 +343,9 @@ flow_state_create (flow_t *flow, u_int seq, u_int ack, u_int flags, u_int size_p
 }
 
 void
-flow_print (flow_t *flow, u_int len)
+flow_print (flow_t *flow, uint32_t len)
 {
-  for (int i = 0; i < len; i++)
+  for (uint32_t i = 0; i < len; i++)
     {
       flow_t *f = &flow[i];
       printf ("FLOW: %u\n", i);
@@ -360,7 +362,7 @@ flow_state_print (flow_t *flow)
   flow_state_t *ptr = flow->next;
   while (ptr != NULL)
     {
-      for (int i = 0; i < ptr->size_payload; ++i)
+      for (uint32_t i = 0; i < ptr->size_payload; ++i)
         {
           printf ("%c", ptr->pkt[i]);
         }
@@ -374,7 +376,7 @@ uint32_t
 flow_state_assemble (flow_t *flow, uint8_t *buffer)
 {
   flow_state_t *state = flow->next;
-  int i = 0;
+  uint32_t i = 0;
   while (state != NULL)
     {
       memcpy (buffer + i, state->pkt + state->offset_payload, state->size_payload);
@@ -431,7 +433,7 @@ contain (u_char *str, u_int len, const char **targets)
   // prefix
   for (int i = 0; targets[i] != NULL; i++)
     {
-      int tarlen = strlen (targets[i]);
+      size_t tarlen = strlen (targets[i]);
       int res = memcmp (str, targets[i], MIN (len, tarlen));
       if (res == 0)
         {

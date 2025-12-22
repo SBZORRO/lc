@@ -164,7 +164,7 @@ th_dispatch_flow (void *arg)
         }
 
       // handle RST/SYN flags
-      int res = flow_flags (flow, flags);
+      uint32_t res = flow_flags (flow, flags);
       if (res == 0)
         {
           free (p);

@@ -27,7 +27,7 @@
   while (0)
 
 /* client.c */
-void do_sent (flow_t *flow, char *msg, int len);
+void do_sent (flow_t *flow, char *msg, size_t len);
 int do_connect (struct in_addr sin_addr, u_short sin_port);
 
 /* pcapimpl.c */
@@ -50,7 +50,7 @@ flow_t *flow_set_src (flow_t *flow, char *src_addr);
 void flow_reset (flow_t *flow);
 flow_t *flow_init (flow_t *flow, const struct in_addr src, const struct in_addr dst, const u_short sport, const u_short dport);
 flow_t *flow_find (flow_arr_t *fa, struct in_addr src, struct in_addr dst, u_short sport, u_short dport);
-int flow_flags (flow_t *flow, uint32_t th_flags);
+uint32_t flow_flags (flow_t *flow, uint32_t th_flags);
 
 flow_arr_t *flow_arr_init (uint32_t size);
 flow_arr_t *flow_arr_add (flow_arr_t *flow);
