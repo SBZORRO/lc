@@ -9,6 +9,9 @@
 #include <pcap/pcap.h>
 #include "packet.h"
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 #define make_filter(ip, p) (src host ip and src port p)
 
 #define SET_IP(f, h, a)                          \
@@ -30,7 +33,7 @@
 void do_sent (flow_t *flow, char *msg, size_t len);
 int do_connect (struct in_addr sin_addr, u_short sin_port);
 
-/* pcapimpl.c */
+/* cptr.c */
 int loop (char *filter_exp);
 void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
 
@@ -50,12 +53,13 @@ flow_t *flow_set_src (flow_t *flow, char *src_addr);
 void flow_reset (flow_t *flow);
 flow_t *flow_init (flow_t *flow, const struct in_addr src, const struct in_addr dst, const u_short sport, const u_short dport);
 flow_t *flow_find (flow_arr_t *fa, struct in_addr src, struct in_addr dst, u_short sport, u_short dport);
-uint32_t flow_flags (flow_t *flow, uint32_t th_flags);
+uint32_t flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp);
+flow_t *flow_add (flow_arr_t *fa);
 
 flow_arr_t *flow_arr_init (uint32_t size);
 flow_arr_t *flow_arr_add (flow_arr_t *flow);
 
-int contain (u_char *str, u_int len, const char **targets);
+int contain (uint8_t *str, uint32_t len, const char **targets);
 int detect (flow_t *flow);
 
 /* logger.c */
@@ -70,8 +74,21 @@ void logger_destory ();
 void *check_malloc (size_t size);
 void *check_realloc (void *ptr, size_t size);
 
+#define filename(src, sp, dst, dp)               \
+  (uint8_t) ((src.s_addr & 0xff000000) >> 24),   \
+    (uint8_t) ((src.s_addr & 0x00ff0000) >> 16), \
+    (uint8_t) ((src.s_addr & 0x0000ff00) >> 8),  \
+    (uint8_t) (src.s_addr & 0x000000ff),         \
+    htons (sp),                                  \
+    (uint8_t) ((dst.s_addr & 0xff000000) >> 24), \
+    (uint8_t) ((dst.s_addr & 0x00ff0000) >> 16), \
+    (uint8_t) ((dst.s_addr & 0x0000ff00) >> 8),  \
+    (uint8_t) (dst.s_addr & 0x000000ff),         \
+    htons (dp)
+
 #define RING_SIZE 1024
 char *flow_filename (flow_t *flow);
+void log_hex (const char *fmt, const u_char *buf, size_t len);
 void print_hex (const u_char *buf, size_t len);
 
 void init_debug (char *argv[]);

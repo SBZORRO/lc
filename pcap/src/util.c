@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "flow.h"
+#include "src/log.c/log.h"
 #include "src/packet.h"
 
 void *
@@ -45,16 +46,7 @@ flow_filename (flow_t *flow)
 
   sprintf (ring_buffer[ring_pos],
            "%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d",
-           (uint8_t) ((flow->ip_src.s_addr & 0xff000000) >> 24),
-           (uint8_t) ((flow->ip_src.s_addr & 0x00ff0000) >> 16),
-           (uint8_t) ((flow->ip_src.s_addr & 0x0000ff00) >> 8),
-           (uint8_t) (flow->ip_src.s_addr & 0x000000ff),
-           flow->port_src,
-           (uint8_t) ((flow->ip_dst.s_addr & 0xff000000) >> 24),
-           (uint8_t) ((flow->ip_dst.s_addr & 0x00ff0000) >> 16),
-           (uint8_t) ((flow->ip_dst.s_addr & 0x0000ff00) >> 8),
-           (uint8_t) (flow->ip_dst.s_addr & 0x000000ff),
-           flow->port_dst);
+           filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
 
   return ring_buffer[ring_pos];
 }
@@ -65,6 +57,22 @@ print_hex (const u_char *buf, size_t len)
   for (size_t i = 0; i < len; i++)
     printf ("%02x ", buf[i]);
   putchar ('\n');
+}
+
+const char hex[] = "0123456789ABCDEF";
+
+void
+log_hex (const char *fmt, const uint8_t *buf, size_t len)
+{
+  char *o = (char *) MALLOC (uint8_t, len * 2 + 1);
+  for (size_t i = 0, j = 0; j < len; i = i + 2, j++)
+    {
+      o[i] = hex[(buf[j] >> 4) & 0x0F];
+      o[i + 1] = hex[buf[j] & 0x0F];
+    }
+  o[len * 2] = 0;
+  log_debug (fmt, o);
+  free (o);
 }
 
 static char *debug_prefix = NULL;

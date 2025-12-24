@@ -22,7 +22,7 @@
 /* char filter_exp[] = "dst port 9998"; /\* The filter expression *\/ */
 extern char *filter_exp; // pcap filter exp
 
-flow_arr_t *flow_ptr; // flow array
+flow_arr_t *fa; // flow array
 #define FLOW_PTR_CAP 255
 
 char *filter_exp = "dst port 9998"; /* The filter expression */
@@ -34,6 +34,8 @@ spsc_queue *pkt_que;
 /* servos */
 /* servou */
 char *server[] = { NULL, "127.0.0.1:9998", "127.0.0.1:9999", NULL };
+
+pthread_mutex_t air_mutex; // flow add/init/reset mutex
 
 // handler -> ring -> th_dispatch_flow -> flow -> th_send_flow
 
@@ -55,7 +57,16 @@ th_send_flow (void *f)
         {
           if (rst++ > 60)
             {
-              flow_reset (flow);
+              pthread_mutex_lock (&air_mutex);
+
+              pthread_mutex_lock (&flow->mutex);
+              state = flow_state_fix_and_pop (flow);
+              pthread_mutex_unlock (&flow->mutex);
+              if (state == NULL && rst++ > 60)
+                {
+                  flow_reset (flow);
+                }
+              pthread_mutex_unlock (&air_mutex);
               break;
             }
           sleep (1);
@@ -77,7 +88,7 @@ th_send_flow (void *f)
       /*       } */
       /*   } */
 
-      log_debug ("sending: %p", state);
+      log_debug (" sending: %p", state);
       // do_sent (flow, (char *) state->pkt + state->offset_payload, (size_t) state->len);
 
       /* write the data into the file */
@@ -153,51 +164,48 @@ th_dispatch_flow (void *arg)
       offset_payload = SIZE_ETHERNET + size_ip + size_tcp;
       payload = (u_char *) (p + offset_payload);
 
+      log_info ("NEW_PCAP: "
+                "%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d "
+                "[%u][%u][%u][%u][%u]",
+                filename (ip->ip_src, tcp->th_sport, ip->ip_dst, tcp->th_dport),
+                flags, seq, ack, offset_payload, size_payload);
+      log_hex ("HPAYLOAD: %s", payload, size_payload);
+      log_debug (" PAYLOAD: \n%.*s", size_payload, payload);
+
+      /*
+       * lock
+       */
+      pthread_mutex_lock (&air_mutex);
       /* Reassemble TCP */
-      flow_t *flow = flow_find (flow_ptr, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
+      flow_t *flow = flow_find (fa, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
       // add new flow
       if (flow == NULL)
         {
-          flow_ptr = flow_arr_add (flow_ptr);
-          flow = flow_ptr->flow + flow_ptr->flow_len - 1;
+          flow = flow_add (fa);
+          if (flow == NULL)
+            {
+              log_error ("TOO_MUCH_FLOW!");
+              pthread_mutex_unlock (&air_mutex);
+              continue;
+            }
           flow_init (flow, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
+          log_debug (
+            "NEW_FLOW: %03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d",
+            filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
         }
 
       // handle RST/SYN flags
-      uint32_t res = flow_flags (flow, flags);
-      if (res == 0)
+      if (flow_handshake (flow, flags, seq, size_payload) == 0)
         {
           free (p);
+          pthread_mutex_unlock (&air_mutex);
           continue;
         }
-      else if (res == 1)
-        {
-          flow->seg_nxt = seq + 1; // SYN consumes one
-        }
-      else if (flow->seg_nxt == 0)
-        {
-          flow->seg_nxt = seq;
-        }
-
-      if (size_payload == 0)
-        {
-          free (p);
-          continue;
-        }
-
-      uint32_t e = seq + size_payload; // [s, e)
-      // outside of window
-      if (SEQ_LEQ (e, flow->seg_nxt))
-        {
-          log_debug ("DISCARD");
-          free (p);
-          continue;
-        }
-
-      log_debug ("dequeued: \n%.*s", size_payload, payload);
 
       flow_state_t *state = flow_state_create (flow, seq, ack, flags, size_payload, offset_payload, p);
+      pthread_mutex_lock (&flow->mutex);
       flow_state_attach (flow, state);
+      pthread_mutex_unlock (&flow->mutex);
 
       if (!(flow->flags & SENDING))
         {
@@ -207,9 +215,17 @@ th_dispatch_flow (void *arg)
               flow->fp = fopen (name, "ab");
             }
           flow->flags = flow->flags | SENDING;
+          log_debug (
+            "NEW_THRD: %03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d",
+            filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
+
           pthread_create (&flow->thread, NULL, th_send_flow, (void *) flow);
           // int rc = pthread_setname_np (pthread_self (), name);
         }
+      pthread_mutex_unlock (&air_mutex);
+      /*
+       * unlock
+       */
     }
   pthread_exit (NULL);
 }
@@ -236,8 +252,15 @@ main (int argc, char *argv[])
   spsc_init (pkt_que, PKT_QUE_CAP);
   log_debug ("pkt_que: %p", pkt_que);
 
-  flow_ptr = flow_arr_init (FLOW_PTR_CAP);
-  log_debug ("flow_ptr: %p", flow_ptr);
+  fa = flow_arr_init (FLOW_PTR_CAP);
+  log_debug ("flow_ptr: %p", fa);
+
+  // reentrant lock
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init (&attr);
+  pthread_mutexattr_settype (&attr, PTHREAD_MUTEX_RECURSIVE);
+  pthread_mutex_init (&air_mutex, &attr);
+  pthread_mutexattr_destroy (&attr);
 
   pthread_t tht_dispatch_flow;
   pthread_create (&tht_dispatch_flow, NULL, th_dispatch_flow, (void *) pkt_que);
@@ -249,6 +272,8 @@ main (int argc, char *argv[])
   loop (filter_exp);
 
   pthread_exit (NULL);
+
+  pthread_mutex_destroy (&air_mutex);
 
   fclose (fp);
 }

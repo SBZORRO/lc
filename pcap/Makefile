@@ -11,7 +11,7 @@ LOG := $(SRC)/log.c
 SRCS := $(wildcard $(SRC)/*.c)
 # SRCS := $(shell find . -name '*.c')
 OBJS := $(patsubst $(SRC)/%.c,$(BLD)/%.o,$(SRCS))
-DEPS := $(SRC)/pcapimpl.c $(SRC)/client.c $(SRC)/flow.c $(LOG)/log.c $(SRC)/logger.c $(SRC)/util.c
+DEPS := $(SRC)/cptr.c $(SRC)/client.c $(SRC)/flow.c $(LOG)/log.c $(SRC)/logger.c $(SRC)/util.c
 
 all: $(BLD)/hello
 
@@ -28,7 +28,7 @@ $(BLD)/hello2: $(SRC)/main.c $(DEPS)
 	$(CC) -o $@ $^ -I../src -I.. /lib64/libpcap.so.1
 
 $(BLD)/test: $(TST)/test.c $(DEPS)
-	$(CC) $(CFLAGS) -g -o $@ $^ -I. -lpcap
+	$(CC) -g -o $@ $^ -I. -lpcap
 
 $(BLD)/hello.so: $(SRC)/main.c
 	$(CC) -shared -fPIC -o $@ $< -lpcap

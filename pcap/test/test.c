@@ -385,7 +385,7 @@ test_detect ()
   CREATE_AND_ATTACH (ptr, 77, 1, "\x1b");
   CREATE_AND_ATTACH (ptr, 9487, 3, "*2A");
   CREATE_AND_ATTACH (ptr, 372, 21, "asdf\x04lasWORLD!adfasd\x04");
-  EXPECT_EQ_INT (detect (ptr), 0);
+  EXPECT_EQ_INT (detect (ptr), 3);
 
   /* CREATE_AND_ATTACH (ptr + 1, 77, 8, "BER2057\x04"); */
   /* EXPECT_EQ_INT (detect (ptr + 1), 2); */
@@ -472,7 +472,7 @@ test_cal ()
 }
 
 void
-test_flow_flags ()
+test_flow_handshake ()
 {
   printf ("test_detect\n");
 
@@ -481,19 +481,21 @@ test_flow_flags ()
   flow_init (ptr, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
 
   ptr->flags |= TH_PUSH;
-  EXPECT_EQ_INT (TH_PUSH | TH_ACK, flow_flags (ptr, TH_ACK));
-  EXPECT_EQ_INT (TH_PUSH | TH_ACK | TH_CWR, flow_flags (ptr, TH_CWR));
-  EXPECT_EQ_INT (TH_PUSH | TH_ACK | TH_CWR, flow_flags (ptr, TH_ACK));
+  EXPECT_EQ_INT (TH_PUSH | TH_ACK, flow_handshake (ptr, TH_ACK, 1, 1));
+  EXPECT_EQ_INT (TH_PUSH | TH_ACK | TH_CWR, flow_handshake (ptr, TH_CWR, 1, 1));
+  EXPECT_EQ_INT (TH_PUSH | TH_ACK | TH_CWR, flow_handshake (ptr, TH_ACK, 1, 1));
 
-  EXPECT_EQ_INT (0, flow_flags (ptr, TH_RST));
-  EXPECT_EQ_INT (0, flow_flags (ptr, TH_ACK));
-  EXPECT_EQ_INT (0, flow_flags (ptr, TH_CWR));
-  EXPECT_EQ_INT (0, flow_flags (ptr, TH_ACK));
+  EXPECT_EQ_INT (0, flow_handshake (ptr, TH_RST, 1, 1));
+  EXPECT_EQ_INT (0, flow_handshake (ptr, TH_ACK, 1, 1));
+  EXPECT_EQ_INT (0, flow_handshake (ptr, TH_CWR, 1, 1));
+  EXPECT_EQ_INT (0, flow_handshake (ptr, TH_ACK, 1, 1));
 
-  EXPECT_EQ_INT (1, flow_flags (ptr, TH_SYN));
-  EXPECT_EQ_INT (TH_SYN | TH_ACK, flow_flags (ptr, TH_ACK));
-  EXPECT_EQ_INT (TH_SYN | TH_ACK | TH_CWR, flow_flags (ptr, TH_CWR));
-  EXPECT_EQ_INT (TH_SYN | TH_ACK | TH_CWR | TH_URG, flow_flags (ptr, TH_ACK | TH_URG));
+  EXPECT_EQ_INT (0, flow_handshake (ptr, TH_SYN, 0, 0));
+  EXPECT_EQ_INT (TH_SYN, flow_handshake (ptr, TH_SYN, 0, 1));
+  EXPECT_EQ_INT (TH_SYN, flow_handshake (ptr, TH_SYN, 0, 2));
+  EXPECT_EQ_INT (TH_SYN | TH_ACK, flow_handshake (ptr, TH_ACK, 1, 1));
+  EXPECT_EQ_INT (TH_SYN | TH_ACK | TH_CWR, flow_handshake (ptr, TH_CWR, 1, 1));
+  EXPECT_EQ_INT (TH_SYN | TH_ACK | TH_CWR | TH_URG, flow_handshake (ptr, TH_ACK | TH_URG, 1, 1));
 }
 
 int
@@ -507,7 +509,7 @@ main (int argc, char *argv[])
   test_contain ();
   test_detect ();
   test_cal ();
-  test_flow_flags ();
+  test_flow_handshake ();
 
   printf ("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
   return main_ret;

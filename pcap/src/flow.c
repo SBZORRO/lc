@@ -23,20 +23,42 @@ flow_arr_init (uint32_t size)
 }
 
 flow_arr_t *
-flow_arr_add (flow_arr_t *flow)
+flow_arr_add (flow_arr_t *fa)
 {
-  if (flow->flow_len == flow->flow_cap)
+  if (fa->flow_len == fa->flow_cap)
     {
       /* TODO rework */
       /* flow_arr_t *new_flow = check_realloc (flow, sizeof (flow_arr_t) + sizeof (flow_t) * flow->flow_cap * 2); */
       /* new_flow->flow_cap = flow->flow_cap * 2; */
       /* new_flow->flow_len = flow->flow_len + 1; */
       /* return new_flow; */
-      log_error ("OVERFLOW!");
+      log_error ("TOO_MUCH_FLOW!");
       return NULL;
     }
-  flow->flow_len = flow->flow_len + 1;
-  return flow;
+  fa->flow_len = fa->flow_len + 1;
+  log_debug ("flow_arr_add: %u", fa->flow_len);
+  return fa;
+}
+
+flow_t *
+flow_add (flow_arr_t *fa)
+{
+  if (fa->flow_len == fa->flow_cap)
+    {
+      for (uint32_t i = 0; i < fa->flow_len; i++)
+        {
+          flow_t f = fa->flow[i];
+          if (f.ip_src.s_addr == 0)
+            {
+              log_debug ("fa_reuse: %u", i);
+              return &fa->flow[i];
+            }
+        }
+      return NULL;
+    }
+  fa->flow_len = fa->flow_len + 1;
+  log_debug ("  fa_add: %u", fa->flow_len - 1);
+  return fa->flow + fa->flow_len - 1;
 }
 
 flow_t *
@@ -118,16 +140,11 @@ flow_reset (flow_t *flow)
   flow->size = 0;
   flow->seg_nxt = 0;
 
-  /* // reentrant lock */
-  /* pthread_mutexattr_t attr; */
-  /* pthread_mutexattr_init (&attr); */
-  /* pthread_mutexattr_settype (&attr, PTHREAD_MUTEX_RECURSIVE); */
-  /* pthread_mutex_init (&flow->mutex, &attr); */
-  /* pthread_mutexattr_destroy (&attr); */
+  pthread_mutex_destroy (&flow->mutex);
 }
 
 uint32_t
-flow_flags (flow_t *flow, uint32_t th_flags)
+flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp)
 {
   // 保留线程状态位
   const u_int THREAD_MASK = SENDING;
@@ -136,28 +153,48 @@ flow_flags (flow_t *flow, uint32_t th_flags)
   u_int thread_bits = flow->flags & THREAD_MASK;
   u_int tcp_bits = flow->flags & TCP_MASK;
 
-  // receive RST
-  if (th_flags & TH_RST)
-    {
-      flow_reset (flow);
-      tcp_bits = TH_RST; // reset tcp bits
-      flow->flags = thread_bits | tcp_bits;
-      return 0;
-    }
-
   // receieve SYN
   if (th_flags & TH_SYN)
     {
       tcp_bits &= ~TH_RST; // unset rst flag
       tcp_bits |= th_flags;
       flow->flags = thread_bits | tcp_bits;
-      return 1; // init seg_nxt seq
+      flow->seg_nxt = seq + 1;
+      seq++; // SEQ_LEQ
+      log_debug ("SYN");
+      // return 1; // init seg_nxt seq
     }
-
-  // 丢包直到 SYN
-  if (tcp_bits & TH_RST)
+  else if (th_flags & TH_RST) // receive RST
+    {
+      flow_reset (flow);
+      tcp_bits = TH_RST; // reset tcp bits
+      flow->flags = thread_bits | tcp_bits;
+      log_debug ("RST");
+      return 0;
+    }
+  else if (tcp_bits & TH_RST) // 丢包直到 SYN
     {
       flow->flags = thread_bits | tcp_bits;
+      log_debug ("DISCARD_RST");
+      return 0;
+    }
+  else if (flow->seg_nxt == 0)
+    {
+      flow->seg_nxt = seq;
+      log_debug ("SEG_NXT");
+    }
+
+  if (sp == 0)
+    {
+      log_debug ("DISCARD_SIZE_0");
+      return 0;
+    }
+
+  uint32_t e = seq + sp; // [s, e)
+  // outside of window
+  if (SEQ_LEQ (e, flow->seg_nxt))
+    {
+      log_debug ("DISCARD_SEQ_LEQ");
       return 0;
     }
 
@@ -205,16 +242,16 @@ flow_state_t *
 flow_state_fix_and_pop (flow_t *flow)
 {
   flow_state_t *state = flow->next;
-  log_debug ("pop: %p", state);
   if (state == NULL || SEQ_LT (flow->seg_nxt, state->seq))
     {
+      log_debug (" NOT_YET: %p", state);
       return NULL;
     }
   uint32_t e = state->seq + state->size_payload;
   // outside of window
   if (SEQ_LEQ (e, flow->seg_nxt))
     {
-      log_debug ("DISCARD");
+      log_debug (" DISCARD: %p", state);
       flow->next = state->next;
       flow->size--;
       flow_state_free (state);
@@ -222,10 +259,11 @@ flow_state_fix_and_pop (flow_t *flow)
     }
   if (SEQ_LT (state->seq, flow->seg_nxt) && SEQ_GT (e, flow->seg_nxt)) // overlap
     {
+      log_debug ("  SLICED: ", state);
       state->size_payload = e - flow->seg_nxt;
       state->offset_payload = state->offset_payload + flow->seg_nxt - state->seq;
     }
-
+  log_debug ("     pop: %p", state);
   flow->seg_nxt += state->size_payload;
   flow->next = state->next;
   flow->size--;
@@ -264,15 +302,13 @@ flow_state_detach (flow_t *flow, flow_state_t *state)
 flow_state_t *
 flow_state_attach (flow_t *flow, flow_state_t *state)
 {
-  pthread_mutex_lock (&flow->mutex);
-  log_debug ("attach: %p", state);
+  log_debug ("  attach: %p", state);
   u_int seq = state->seq;
   clock_gettime (CLOCK_REALTIME, &flow->ts);
   if (flow->next == NULL)
     {
       flow->next = state;
       flow->size++;
-      pthread_mutex_unlock (&flow->mutex);
       return state;
     }
   else
@@ -282,7 +318,6 @@ flow_state_attach (flow_t *flow, flow_state_t *state)
       if (seq == ptr->seq)
         {
           flow->next = state;
-          pthread_mutex_unlock (&flow->mutex);
           return state;
         }
       /* retrans packet */
@@ -291,7 +326,6 @@ flow_state_attach (flow_t *flow, flow_state_t *state)
           state->next = flow->next;
           flow->next = state;
           flow->size++;
-          pthread_mutex_unlock (&flow->mutex);
           return state;
         }
 
@@ -304,7 +338,6 @@ flow_state_attach (flow_t *flow, flow_state_t *state)
             {
               state->next = ptr->next;
               prev->next = state;
-              pthread_mutex_unlock (&flow->mutex);
               return state;
             }
           /* retrans packet */
@@ -313,7 +346,6 @@ flow_state_attach (flow_t *flow, flow_state_t *state)
               state->next = ptr;
               prev->next = state;
               flow->size++;
-              pthread_mutex_unlock (&flow->mutex);
               return state;
             }
           prev = ptr;
@@ -321,7 +353,6 @@ flow_state_attach (flow_t *flow, flow_state_t *state)
         }
       prev->next = state;
       flow->size++;
-      pthread_mutex_unlock (&flow->mutex);
       return state;
     }
 }
@@ -372,6 +403,14 @@ flow_state_print (flow_t *flow)
   printf ("\n");
 }
 
+void
+flow_state_log (flow_state_t *state)
+{
+  log_debug ("   STATE: [%p][%p][%p][%u][%u][%u][%u][%u]",
+             state->next, state->flow, state->pkt,
+             state->flags, state->seq, state->ack, state->offset_payload, state->size_payload);
+}
+
 uint32_t
 flow_state_assemble (flow_t *flow, uint8_t *buffer)
 {
@@ -393,7 +432,7 @@ flow_state_assemble (flow_t *flow, uint8_t *buffer)
 void
 flow_state_free (flow_state_t *fs)
 {
-  log_debug ("free: %p", fs);
+  log_debug ("    free: %p", fs);
   if (fs == NULL)
     return;
   fs->next = NULL;
@@ -420,11 +459,43 @@ const char *curve_phase_i = "\x81\x10\x80";
 const char *curve_phase_p = "\x81\x20\x80";
 const char *curve_phase_e = "\x81\x30\x80";
 
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+/* * 发送 */
+/*   请求ICC:          1b5136430d */
+/*   请求设备ID:       1b5236440d */
+/*   请求测量数据CP1:  1b2433460d */
+/*   请求测量数据CP2:  1b2b34360d */
+/*   请求设备设置:     1b2934340d */
+/*   请求文本消息:     1b2a34350d */
+/*   请求停止通讯:     1b5537300d */
+/*   发送NOP命令:      1b3034420d */
+/*   请求实时数据配置: 1b5336450d */
+/*   发送实时数据配置: 1b5430303031303130313033303142360d */
+/*   启动数据流:       d0c1cfc0c0 */
+/*   关闭数据流:       d0c1c0c0c0 */
+/*   发送设备ID:       01523031363127536d6f44726167657256656e742730312e30333a30362e303041410d */
+/*     0161'SmoDragerVent'01.03:06.00 */
+
+// clang-format off
+const char *drager_resp[] = { "\x1BQ", "\x01Q", "\x1BR", "\x01R", "\x01S", "\x01T", "\x01BV", "\x01$", "\x01+", "\x01)", "\x01*", "\x01""0", "\x1B""0", "\x01\x15", "\x01\x01" };
+// clang-format on
+const char *drager_cmd[] = {
+  /* "\x1b5136430d", */
+  /* "\x1b5236440d", */
+  /* "\x1b2433460d", */
+  /* "\x1b2b34360d", */
+  /* "\x1b2934340d", */
+  /* "\x1b2a34350d", */
+  /* "\x1b5537300d", */
+  /* "\x1b3034420d", */
+  /* "\x1b5336450d", */
+  /* "\x1b5430303031303130313033303142360d", */
+  /* "\xd0c1cfc0c0", */
+  /* "\xd0c1c0c0c0", */
+  /* "\x01523031363127536d6f44726167657256656e742730312e30333a30362e303041410d" */
+};
 
 int
-contain (u_char *str, u_int len, const char **targets)
+contain (uint8_t *str, uint32_t len, const char **targets)
 {
   if (len == 0)
     {
@@ -466,6 +537,10 @@ detect (flow_t *flow)
       if (contain (ptr->pkt, ptr->size_payload, servou_resp))
         {
           return 2;
+        }
+      if (contain (ptr->pkt, ptr->size_payload, drager_resp))
+        {
+          return 3;
         }
       // contain (ptr->payload, ptr->len, servos_requ);
 
