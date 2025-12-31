@@ -25,7 +25,7 @@ $(BLD)/hello: $(SRC)/main.c $(DEPS)
 	$(CC) $(CFLAGS) -g -o $@ $^ -I. -lpcap
 
 $(BLD)/hello2: $(SRC)/main.c $(DEPS)
-	$(CC) -o $@ $^ -I../src -I.. /lib64/libpcap.so.1
+	$(CC) -o $@ $^ -I./src -I. /lib64/libpcap.so.1
 
 $(BLD)/test: $(TST)/test.c $(DEPS)
 	$(CC) -g -o $@ $^ -I. -lpcap
