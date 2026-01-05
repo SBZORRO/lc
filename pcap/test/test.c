@@ -498,6 +498,32 @@ test_flow_handshake ()
   EXPECT_EQ_INT (TH_SYN | TH_ACK | TH_CWR | TH_URG, flow_handshake (ptr, TH_ACK | TH_URG, 1, 1));
 }
 
+#define TEST_SET_IP(t, host, ei, ep)                                         \
+  do                                                                         \
+    {                                                                        \
+      flow_t flow;                                                           \
+      flow_t *ptr = &flow;                                                   \
+      flow_init (ptr, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0); \
+      SET_IP (ptr, t, host);                                                 \
+      EXPECT_EQ_INT (ep, ntohs (ptr->port_##t));                             \
+      EXPECT_EQ_INT (ei, ptr->ip_##t.s_addr);                                \
+      flow_reset (ptr);                                                      \
+    }                                                                        \
+  while (0)
+
+void
+test_set_ip ()
+{
+  TEST_SET_IP (tar, "127.0.0.1:1234", 1 << 24 | 127, 1234);
+  TEST_SET_IP (tar, "192.168.0.1:9999", 1 << 24 | 168 << 8 | 192, 9999);
+  TEST_SET_IP (tar, "1.1.1.1:1", 1 << 24 | 1 << 16 | 1 << 8 | 1, 1);
+  TEST_SET_IP (tar, "255.255.255.255:255", 255 << 24 | 255 << 16 | 255 << 8 | 255, 255);
+  TEST_SET_IP (src, "10.10.10.10:10", 10 << 24 | 10 << 16 | 10 << 8 | 10, 10);
+  TEST_SET_IP (src, "0.0.0.0:0", 0, 0);
+  TEST_SET_IP (dst, "127.0.1.1:65535", 1 << 24 | 1 << 16 | 127, 65535);
+  TEST_SET_IP (dst, "0.127.127.1:123", 1 << 24 | 127 << 16 | 127 << 8, 123);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -510,6 +536,7 @@ main (int argc, char *argv[])
   test_detect ();
   test_cal ();
   test_flow_handshake ();
+  test_set_ip ();
 
   printf ("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
   return main_ret;

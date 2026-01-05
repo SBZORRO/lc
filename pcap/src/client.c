@@ -6,22 +6,24 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include "flow.h"
+#include "src/log.c/log.h"
 #include "src/packet.h"
 
 void
 do_sent (flow_t *flow, char *msg, size_t len)
 {
+  /* TODO half send */
   while (send (flow->sock, msg, len, MSG_NOSIGNAL) < 0)
     {
       perror ("Send Fail");
-      if (errno == EPIPE || errno == ECONNRESET)
+      log_error ("SEND_ERR: [%d][%p]", errno, flow);
+      if (errno == EPIPE || errno == ECONNRESET || errno == ENOTCONN)
         {
           while ((flow->sock = do_connect (flow->ip_dst, flow->port_dst)) == 0)
             {
@@ -39,7 +41,7 @@ do_connect (struct in_addr ip, u_short port)
   if ((sock = socket (AF_INET, SOCK_STREAM, 0)) < 0)
     {
       perror ("Socket creation failed");
-      return (EXIT_FAILURE);
+      return sock;
     }
 
   serv_addr.sin_family = AF_INET;
@@ -61,7 +63,7 @@ do_connect (struct in_addr ip, u_short port)
         }
       sock = -1; // 防止后续误用/重复 close
       perror ("Connection failed");
-      return (EXIT_FAILURE);
+      return sock;
     }
 
   printf ("Connection Start\n");

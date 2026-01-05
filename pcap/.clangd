@@ -2,4 +2,5 @@
 Diagnostics:
   UnusedIncludes: Strict
   MissingIncludes: Strict
-
+Completion:
+  HeaderInsertion: IWYU

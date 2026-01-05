@@ -204,40 +204,6 @@ flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp)
   return flow->flags;
 }
 
-flow_t *
-flow_set_dst (flow_t *flow, char *dst_addr)
-{
-  if (dst_addr != NULL)
-    {
-      char *dst = strdup (dst_addr);
-      char *d = dst;
-      char *dst_ip = strsep (&dst, ":");
-      char *dst_port = strsep (&dst, ":");
-      /* flow->ip_dst.s_addr = inet_addr (dst_ip); */
-      inet_aton (dst_ip, &flow->ip_dst);
-      flow->port_dst = htons ((uint16_t) atoi (dst_port));
-      free (d);
-    }
-  return flow;
-}
-
-flow_t *
-flow_set_src (flow_t *flow, char *src_addr)
-{
-  if (src_addr != NULL)
-    {
-      char *src = strdup (src_addr);
-      char *s = src;
-      char *src_ip = strsep (&src, ":");
-      char *src_port = strsep (&src, ":");
-      /* flow->ip_dst.s_addr = inet_addr (dst_ip); */
-      inet_aton (src_ip, &flow->ip_src);
-      flow->port_src = htons ((uint16_t) atoi (src_port));
-      free (s);
-    }
-  return flow;
-}
-
 flow_state_t *
 flow_state_fix_and_pop (flow_t *flow)
 {
@@ -476,7 +442,7 @@ const char *curve_phase_e = "\x81\x30\x80";
 /*     0161'SmoDragerVent'01.03:06.00 */
 
 // clang-format off
-const char *drager_resp[] = { "\x1BQ", "\x01Q", "\x1BR", "\x01R", "\x01S", "\x01T", "\x01BV", "\x01$", "\x01+", "\x01)", "\x01*", "\x01""0", "\x1B""0", "\x01\x15", "\x01\x01" };
+const char *drager_resp[] = { "\x1BQ", "\x01Q", "\x1BR", "\x01R", "\x01S", "\x01T", "\x01BV", "\x01$", "\x01+", "\x01)", "\x01*", "\x01""0", "\x1B""0", "\x01\x15", "\x01\x01", NULL };
 // clang-format on
 const char *drager_cmd[] = {
   /* "\x1b5136430d", */
@@ -525,26 +491,23 @@ contain (uint8_t *str, uint32_t len, const char **targets)
 }
 
 int
-detect (flow_t *flow)
+detect (flow_state_t *ptr)
 {
-  flow_state_t *ptr = flow->next;
-  while (ptr != NULL)
+  if (ptr != NULL)
     {
-      if (contain (ptr->pkt, ptr->size_payload, servos_resp))
+      if (contain (ptr->pkt + ptr->offset_payload, ptr->size_payload, servos_resp))
         {
           return 1;
         }
-      if (contain (ptr->pkt, ptr->size_payload, servou_resp))
+      if (contain (ptr->pkt + ptr->offset_payload, ptr->size_payload, servou_resp))
         {
           return 2;
         }
-      if (contain (ptr->pkt, ptr->size_payload, drager_resp))
+      if (contain (ptr->pkt + ptr->offset_payload, ptr->size_payload, drager_resp))
         {
           return 3;
         }
       // contain (ptr->payload, ptr->len, servos_requ);
-
-      ptr = ptr->next;
     }
   return 0;
 }

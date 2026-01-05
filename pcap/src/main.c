@@ -33,7 +33,8 @@ spsc_queue *pkt_que;
 
 /* servos */
 /* servou */
-char *server[] = { NULL, "127.0.0.1:9998", "127.0.0.1:9999", NULL };
+/* drager */
+char *server[] = { NULL, "127.0.0.1:9999", "127.0.0.1:9998", "127.0.0.1:9997", NULL };
 
 pthread_mutex_t air_mutex; // flow add/init/reset mutex
 
@@ -74,30 +75,32 @@ th_send_flow (void *f)
         }
       rst = 0;
 
-      /* if (flow->sock == 0) */
-      /*   { */
-      /*     int res = detect (flow); */
-      /*     if (res == 0) */
-      /*       { */
-      /*         continue; */
-      /*       } */
-      /*     SET_IP (flow, tar, server[res]); */
-      /*     while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) == 0) */
-      /*       { */
-      /*         sleep (1); */
-      /*       } */
-      /*   } */
-
-      log_debug (" sending: %p", state);
-      // do_sent (flow, (char *) state->pkt + state->offset_payload, (size_t) state->len);
-
       /* write the data into the file */
+      log_debug (" writing: %p", state);
       if (fwrite ((char *) state->pkt + state->offset_payload, (size_t) state->size_payload, 1, flow->fp) != 1)
         {
           // DEBUG (1) ("write to %s failed: ", flow_filename (state->flow));
           perror ("");
         }
       fflush (flow->fp);
+
+      if (flow->sock <= 0)
+        {
+          int res = detect (state);
+          log_debug ("detected: [%p][%d]", flow, res);
+          if (res == 0)
+            {
+              continue;
+            }
+          SET_IP (flow, tar, server[res]);
+          while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) <= 0)
+            {
+              log_debug ("RETRYING: %p", flow);
+              sleep (1);
+            }
+        }
+      log_debug (" sending: %p", state);
+      do_sent (flow, (char *) state->pkt + state->offset_payload, (size_t) state->size_payload);
 
       flow_state_free (state);
     }

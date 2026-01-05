@@ -38,7 +38,10 @@ loop (char *filter_exp)
       net = 0;
       mask = 0;
     }
-  pt = pcap_open_live (dev, bufsize, 1, 1000, errbuf);
+  // pt = pcap_open_live (dev, bufsize, 1, 1000, errbuf);
+  // pt = pcap_open_live ("lo", bufsize, 1, 1000, errbuf);
+  pt = pcap_open_offline ("../test/si.pcapng", errbuf);
+
   if (pt == NULL)
     {
       fprintf (stderr, "Could't open D %s: \n", errbuf);

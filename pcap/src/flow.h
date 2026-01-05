@@ -14,19 +14,20 @@
 
 #define make_filter(ip, p) (src host ip and src port p)
 
-#define SET_IP(f, h, a)                          \
-  do                                             \
-    {                                            \
-      if (a != NULL)                             \
-        {                                        \
-          char *h = strdup (a);                  \
-          char *h##_ip = strsep (&h, ":");       \
-          char *h##_port = strsep (&h, ":");     \
-          inet_aton (h##_ip, &f->ip_##h);        \
-          f->port_##h = htons (atoi (h##_port)); \
-          free (h);                              \
-        }                                        \
-    }                                            \
+#define SET_IP(f, h, a)                                     \
+  do                                                        \
+    {                                                       \
+      if (a != NULL)                                        \
+        {                                                   \
+          char *h = strdup (a);                             \
+          char *hh = h;                                     \
+          char *h##_ip = strsep (&h, ":");                  \
+          char *h##_port = strsep (&h, ":");                \
+          inet_aton (h##_ip, &f->ip_##h);                   \
+          f->port_##h = htons ((uint16_t) atoi (h##_port)); \
+          free (hh);                                        \
+        }                                                   \
+    }                                                       \
   while (0)
 
 /* client.c */
@@ -60,7 +61,7 @@ flow_arr_t *flow_arr_init (uint32_t size);
 flow_arr_t *flow_arr_add (flow_arr_t *flow);
 
 int contain (uint8_t *str, uint32_t len, const char **targets);
-int detect (flow_t *flow);
+int detect (flow_state_t *state);
 
 /* logger.c */
 void init_logger (FILE *fp);
