@@ -1,10 +1,9 @@
 #pragma once
-
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <sys/types.h>
-#include "src/flow.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifndef CACHELINE
 # define CACHELINE 64
@@ -31,8 +30,14 @@ static inline spsc_queue *
 spsc_init (size_t capacity)
 {
   size_t bytes = sizeof (spsc_queue) + capacity * sizeof (void *);
-  spsc_queue *q = (spsc_queue *) check_malloc (bytes);
 
+  spsc_queue *q = (spsc_queue *) malloc (bytes);
+  if (q == NULL)
+    {
+      /* DEBUG(0) ("Malloc failed - out of memory?"); */
+      perror ("FAILED_MALLOC_SPSC");
+      exit (1);
+    }
   // capacity 必须是 2 的幂
   q->capacity = capacity;
   q->mask = capacity - 1;

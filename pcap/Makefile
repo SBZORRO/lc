@@ -31,6 +31,11 @@ $(BLD)/hello2: $(SRC)/main.c $(DEPS)
 
 $(BLD)/hello3: $(SRC)/main.c $(DEPS)
 	$(CC) $(CFLAGS) -g -o $@ $^ -I. ./libpcap.so.1.9.1 $(LDFLAGS)
+$(BLD)/win: $(SRC)/main.c $(DEPS)
+	$(CC) $(CFLAGS) -g -o $@ $^ -I../../WpdPack_4_1_2/WpdPack/Include -I../../w64devkit/include -L../../WpdPack_4_1_2/WpdPack/Lib -L../../w64devkit/lib -L. -lwpcap -lws2_32
+
+$(BLD)/wintest: $(TST)/test.c $(DEPS)
+	$(CC) $(CFLAGS) -g -o $@ $^ -I../../WpdPack_4_1_2/WpdPack/Include -I../../w64devkit/include -L../../WpdPack_4_1_2/WpdPack/Lib -L../../w64devkit/lib -L. -lwpcap -lws2_32
 
 $(BLD)/test: $(TST)/test.c $(DEPS)
 	$(CC) -g -o $@ $^ -I. -lpcap

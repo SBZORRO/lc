@@ -1,13 +1,9 @@
 #include "flow.h"
-#include <arpa/inet.h>
-#include <bits/time.h>
-#include <netinet/in.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 #include "log.c/log.h"

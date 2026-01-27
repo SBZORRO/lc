@@ -1,6 +1,15 @@
 #pragma once
-#include <netinet/in.h>
+#ifdef _WIN32
+# include <windows.h>
+# include <winsock2.h>
+# include <ws2tcpip.h>
+#else
+# include <arpa/inet.h>
+# include <netinet/in.h>
+# include <netinet/tcp.h>
+#endif
 #include <pcap/pcap.h>
+#include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>

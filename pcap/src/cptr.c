@@ -1,11 +1,8 @@
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <pcap/pcap.h>
+#include <pcap.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include "flow.h"
 #include "log.c/log.h"
 #include "spsc_queue.h"

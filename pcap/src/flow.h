@@ -1,12 +1,13 @@
 #pragma once
+#ifndef _WIN32
+# include <string.h>
+#endif
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <sys/types.h>
 
-#include <netinet/in.h>
-#include <pcap/pcap.h>
+#include <pcap.h>
 #include "packet.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -21,9 +22,9 @@
         {                                                   \
           char *h = strdup (a);                             \
           char *hh = h;                                     \
-          char *h##_ip = strsep (&h, ":");                  \
-          char *h##_port = strsep (&h, ":");                \
-          inet_aton (h##_ip, &f->ip_##h);                   \
+          char *h##_ip = strtok (h, ":");                   \
+          char *h##_port = strtok (NULL, ":");              \
+          inet_pton (AF_INET, h##_ip, &f->ip_##h);          \
           f->port_##h = htons ((uint16_t) atoi (h##_port)); \
           free (hh);                                        \
         }                                                   \
@@ -98,3 +99,30 @@ void init_debug (char *argv[]);
   debug_real
 void debug_real (char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void die (char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
+
+static void *
+portable_memmem (const void *haystack, size_t haystacklen,
+                 const void *needle, size_t needlelen)
+{
+  if (!haystack || !needle)
+    return NULL;
+
+  const unsigned char *h = (const unsigned char *) haystack;
+  const unsigned char *n = (const unsigned char *) needle;
+
+  if (needlelen == 0)
+    return (void *) h;
+  if (needlelen > haystacklen)
+    return NULL;
+
+  for (size_t i = 0; i + needlelen <= haystacklen; i++)
+    {
+      if (h[i] == n[0] && memcmp (h + i, n, needlelen) == 0)
+        return (void *) (h + i);
+    }
+  return NULL;
+}
+
+#ifdef _WIN32
+# define memmem portable_memmem
+#endif
