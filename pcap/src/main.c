@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <pcap/pcap.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,17 +20,14 @@
 /* 10.160.16.157 */
 /* 4001-4008 */
 /* dst host 10.160.16.157 and tcp dst portrange 4001-4008 */
-/* char filter_exp[] = "dst port 9998"; /\* The filter expression *\/ */
-extern char *filter_exp; // pcap filter exp
+char *filter_exp = "dst host 45.63.92.159"; /* The filter expression */
 
 flow_arr_t *fa; // flow array
-#define FLOW_PTR_CAP 255
-
-char *filter_exp = "dst port 9998"; /* The filter expression */
+#define FLOW_PTR_CAP 1024
 
 spsc_queue *pkt_que;
 // 2^n
-#define PKT_QUE_CAP 65536
+#define PKT_QUE_CAP 256 * 1024 * 1024
 
 /* servos */
 /* servou */
@@ -46,7 +44,7 @@ th_send_flow (void *f)
   flow_t *flow = (flow_t *) f;
   int rc = pthread_setname_np (pthread_self (), "send_flow");
   if (rc != 0)
-    log_debug ("sendflow_setname: %s\n", strerror (rc));
+    log_debug ("th_sendflow_setname: %s\n", strerror (rc));
   int rst = 0;
   while (1)
     {
@@ -76,18 +74,19 @@ th_send_flow (void *f)
       rst = 0;
 
       /* write the data into the file */
-      log_debug (" writing: %p", state);
+      log_debug (" writing: [%p][%p][%u]", flow, state, state->seq);
       if (fwrite ((char *) state->pkt + state->offset_payload, (size_t) state->size_payload, 1, flow->fp) != 1)
         {
+          log_error ("FAILED_WRITING: [%p][%p][%u]", flow, state, state->seq);
           // DEBUG (1) ("write to %s failed: ", flow_filename (state->flow));
-          perror ("");
+          perror ("FAILED_WRITING");
         }
       fflush (flow->fp);
 
       if (flow->sock <= 0)
         {
           int res = detect (state);
-          log_debug ("detected: [%p][%d]", flow, res);
+          log_debug ("detected: [%p][%p][%u][%d]", flow, state, state->seq, res);
           if (res == 0)
             {
               continue;
@@ -95,11 +94,12 @@ th_send_flow (void *f)
           SET_IP (flow, tar, server[res]);
           while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) <= 0)
             {
-              log_debug ("RETRYING: %p", flow);
-              sleep (1);
+              log_error ("FAILED_CONNECTING: [%p][%d]", flow, flow->sock);
+              break;
+              // sleep (1);
             }
         }
-      log_debug (" sending: %p", state);
+      log_debug (" sending: [%p][%p][%u]", flow, state, state->seq);
       do_sent (flow, (char *) state->pkt + state->offset_payload, (size_t) state->size_payload);
 
       flow_state_free (state);
@@ -114,7 +114,7 @@ th_dispatch_flow (void *arg)
   //  prctl (PR_SET_NAME, "main-thread", 0, 0, 0);
   int rc = pthread_setname_np (pthread_self (), "dispatch_flow");
   if (rc != 0)
-    log_debug ("dispatch_setname: %s\n", strerror (rc));
+    log_debug ("th_dispatch_setname: %s\n", strerror (rc));
 
   spsc_queue *q = (spsc_queue *) arg;
 
@@ -124,6 +124,7 @@ th_dispatch_flow (void *arg)
 
       if (!spsc_dequeue (q, (void **) &p))
         {
+          log_trace ("QUEUE_SIZE_0");
           // 队空，稍微睡一下
           struct timespec ts = { 0, 1000000 };
           nanosleep (&ts, NULL);
@@ -146,7 +147,7 @@ th_dispatch_flow (void *arg)
       size_ip = IP_HL (ip) * 4;
       if (size_ip < 20)
         {
-          log_error ("   * Invalid IP header length: %u bytes\n", size_ip);
+          log_error ("Invalid_IP_header_length: %u\n", size_ip);
           free (p);
           continue;
         }
@@ -155,7 +156,7 @@ th_dispatch_flow (void *arg)
       size_tcp = TH_OFF (tcp) * 4;
       if (size_tcp < 20)
         {
-          log_error ("   * Invalid TCP header length: %u bytes\n", size_tcp);
+          log_error ("Invalid_TCP_ header_length: %u\n", size_tcp);
           free (p);
           continue;
         }
@@ -167,13 +168,13 @@ th_dispatch_flow (void *arg)
       offset_payload = SIZE_ETHERNET + size_ip + size_tcp;
       payload = (u_char *) (p + offset_payload);
 
-      log_info ("NEW_PCAP: "
-                "%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d "
+      log_info ("DEQUEUED: "
+                "[%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d]"
                 "[%u][%u][%u][%u][%u]",
                 filename (ip->ip_src, tcp->th_sport, ip->ip_dst, tcp->th_dport),
-                flags, seq, ack, offset_payload, size_payload);
+                seq, ack, flags, offset_payload, size_payload);
       log_hex ("HPAYLOAD: %s", payload, size_payload);
-      log_debug (" PAYLOAD: \n%.*s", size_payload, payload);
+      log_debug ("APAYLOAD: %.*s", size_payload, payload);
 
       /*
        * lock
@@ -193,7 +194,8 @@ th_dispatch_flow (void *arg)
             }
           flow_init (flow, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
           log_debug (
-            "NEW_FLOW: %03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d",
+            "NEW_FLOW: [%p][%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d]",
+            flow,
             filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
         }
 
@@ -206,6 +208,7 @@ th_dispatch_flow (void *arg)
         }
 
       flow_state_t *state = flow_state_create (flow, seq, ack, flags, size_payload, offset_payload, p);
+      log_debug ("NEW_STAT: [%p][%p][%u]", flow, state, seq);
       pthread_mutex_lock (&flow->mutex);
       flow_state_attach (flow, state);
       pthread_mutex_unlock (&flow->mutex);
@@ -219,9 +222,9 @@ th_dispatch_flow (void *arg)
             }
           flow->flags = flow->flags | SENDING;
           log_debug (
-            "NEW_THRD: %03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d",
+            "NEW_THRD: [%p][%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d]",
+            flow,
             filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
-
           pthread_create (&flow->thread, NULL, th_send_flow, (void *) flow);
           // int rc = pthread_setname_np (pthread_self (), name);
         }
@@ -250,9 +253,7 @@ main (int argc, char *argv[])
   init_logger (fp);
   log_debug ("Hello World!");
 
-  size_t bytes = sizeof (spsc_queue) + PKT_QUE_CAP * sizeof (void *);
-  pkt_que = (spsc_queue *) check_malloc (bytes);
-  spsc_init (pkt_que, PKT_QUE_CAP);
+  pkt_que = spsc_init (PKT_QUE_CAP);
   log_debug ("pkt_que: %p", pkt_que);
 
   fa = flow_arr_init (FLOW_PTR_CAP);
@@ -270,7 +271,7 @@ main (int argc, char *argv[])
   log_debug ("tht_dispatch_flow: %u", tht_dispatch_flow);
 
   // block
-  filter_exp = argv[1];
+  filter_exp = argv[1] == NULL ? filter_exp : argv[1];
   log_debug ("filter_exp: %s", filter_exp);
   loop (filter_exp);
 

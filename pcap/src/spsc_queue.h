@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <sys/types.h>
+#include "src/flow.h"
 
 #ifndef CACHELINE
 # define CACHELINE 64
@@ -26,14 +27,18 @@ typedef struct spsc_queue
 // 创建时要自己分配足够空间：sizeof(spsc_queue) + capacity * sizeof(void*)
 
 // 初始化
-static inline void
-spsc_init (spsc_queue *q, size_t capacity)
+static inline spsc_queue *
+spsc_init (size_t capacity)
 {
+  size_t bytes = sizeof (spsc_queue) + capacity * sizeof (void *);
+  spsc_queue *q = (spsc_queue *) check_malloc (bytes);
+
   // capacity 必须是 2 的幂
   q->capacity = capacity;
   q->mask = capacity - 1;
   atomic_store_explicit (&q->head, 0, memory_order_relaxed);
   atomic_store_explicit (&q->tail, 0, memory_order_relaxed);
+  return q;
 }
 
 // 入队：生产者线程调用

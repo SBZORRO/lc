@@ -1,82 +1,89 @@
-#include <arpa/inet.h>
-#include <netinet/in.h>
+#include <inttypes.h>
+#include <pcap/pcap.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include "../src/captotcp.h"
+#include "../src/flow.h"
 
-static int main_ret = 0;
-static int test_count = 0;
-static int test_pass = 0;
-
-#define EXPECT_EQ_BASE(equality, expect, actual, format)                     \
-  do                                                                         \
-    {                                                                        \
-      test_count++;                                                          \
-      if (equality)                                                          \
-        test_pass++;                                                         \
-      else                                                                   \
-        {                                                                    \
-          fprintf (stderr, "%s:%d: expect: " format " actual: " format "\n", \
-                   __FILE__, __LINE__, expect, actual);                      \
-          main_ret = 1;                                                      \
-        }                                                                    \
-    }                                                                        \
-  while (0)
-
-#define EXPECT_EQ_INT(expect, actual) \
-  EXPECT_EQ_BASE ((expect) == (actual), expect, actual, "%d")
-
-void *
-check_malloc (size_t size)
+static void
+hex_dump (const uint8_t *p, int len, int max_bytes)
 {
-  void *ptr;
-
-  if ((ptr = malloc (size)) == NULL)
+  int n = len < max_bytes ? len : max_bytes;
+  for (int i = 0; i < n; i++)
     {
-      /* DEBUG(0) ("Malloc failed - out of memory?"); */
-      exit (1);
+      printf ("%02x%s", p[i], (i + 1) % 16 == 0 ? "\n" : " ");
     }
-  return ptr;
-}
-
-void
-test_create_flow ()
-{
-  char *argv[]
-    = { "../build/hello",
-        "((src host 10.160.231.153 and src port 9997) or (dst host 10.160.231.152 and dst port 9998))",
-        "10.160.231.152:9999",
-        "10.160.231.153:9997",
-        "222.222.222.222:222",
-        "22.22.22.22:22",
-        "111.111.111.111:111",
-        "11.11.11.11:11" };
-  int argc = 8;
-
-  char *addr = argv[3];
-  printf ("%s", addr);
-  char *split = strstr (addr, ":");
-  char *port = split + 1;
-  printf ("indi>%s<", ++split);
-  printf ("\ngap: %d", (int) (addr - split));
-  char ip[split - addr - 1];
-  memcpy (ip, addr, split - addr - 1);
-  printf ("\nip:: %s", ip);
-  printf ("\nport:: %d", (int) strlen(port));
-
-  /* char* ip = strncpy() */
-  /* char *port = strtok (NULL, "\0"); */
-
-  /* EXPECT_EQ_INT (1, len); */
+  if (n % 16 != 0)
+    printf ("\n");
+  if (len > max_bytes)
+    printf ("... (%d bytes total)\n", len);
 }
 
 int
-main (int argc, char *argv[])
+main (int argc, char **argv)
 {
+  if (argc != 2)
+    {
+      fprintf (stderr, "usage: %s <file.pcap|file.pcapng>\n", argv[0]);
+      return 2;
+    }
 
-  test_create_flow ();
-  printf ("%d/%d (%3.2f%%) passed\n", test_pass, test_count,
-          test_pass * 100.0 / test_count);
-  return main_ret;
+  char errbuf[PCAP_ERRBUF_SIZE];
+  pcap_t *pt = pcap_open_offline (argv[1], errbuf);
+  if (!pt)
+    {
+      fprintf (stderr, "pcap_open_offline failed: %s\n", errbuf);
+      return 1;
+    }
+
+  struct bpf_program fp; /* The compiled filter expression */
+  const char *filter_exp = "";
+  if (pcap_compile (pt, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1)
+    {
+      fprintf (stderr, "Couldn't parse filter %s: %s\n", filter_exp,
+               pcap_geterr (pt));
+      return (2);
+    }
+  if (pcap_setfilter (pt, &fp) == -1)
+    {
+      fprintf (stderr, "Couldn't install filter %s: %s\n", filter_exp,
+               pcap_geterr (pt));
+      return (2);
+    }
+
+  pcap_handler handler = dl_ethernet;
+  pcap_loop (pt, -1, handler, NULL);
+
+  return 0;
+
+  /* int dlt = pcap_datalink (pt); */
+  /* printf ("DLT=%d (%s)\n", dlt, pcap_datalink_val_to_name (dlt)); */
+
+  /* struct pcap_pkthdr *hdr; */
+  /* const uint8_t *data; */
+  /* int rc; */
+  /* uint64_t idx = 0; */
+
+  /* while ((rc = pcap_next_ex (pt, &hdr, &data)) >= 0) */
+  /*   { */
+  /*     if (rc == 0) */
+  /*       continue; // unlikely for offline, but safe */
+
+  /*     idx++; */
+  /*     // hdr->ts.tv_sec / hdr->ts.tv_usec (或 tv_nsec 取决于精度设置) */
+  /*     printf ("#%" PRIu64 " ts=%ld.%06ld caplen=%u len=%u\n", */
+  /*             idx, */
+  /*             (long) hdr->ts.tv_sec, (long) hdr->ts.tv_usec, */
+  /*             hdr->caplen, hdr->len); */
+
+  /*     hex_dump (data, (int) hdr->caplen, 64); */
+  /*   } */
+
+  /* if (rc == -1) */
+  /*   { */
+  /*     fprintf (stderr, "pcap_next_ex error: %s\n", pcap_geterr (pt)); */
+  /*   } */
+
+  /* pcap_close (pt); */
+  /* return (rc == -1) ? 1 : 0; */
 }

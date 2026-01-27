@@ -7,8 +7,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "flow.h"
-#include "src/log.c/log.h"
-#include "src/packet.h"
+#include "log.c/log.h"
+#include "packet.h"
 
 void *
 check_malloc (size_t size)
@@ -39,16 +39,10 @@ check_realloc (void *ptr, size_t size)
 char *
 flow_filename (flow_t *flow)
 {
-  static char ring_buffer[RING_SIZE][48];
-  static int ring_pos = 0;
-
-  ring_pos = (ring_pos + 1) % RING_SIZE;
-
-  sprintf (ring_buffer[ring_pos],
+  sprintf (flow->filename,
            "%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d",
            filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
-
-  return ring_buffer[ring_pos];
+  return flow->filename;
 }
 
 void

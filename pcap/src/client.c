@@ -22,14 +22,17 @@ do_sent (flow_t *flow, char *msg, size_t len)
   while (send (flow->sock, msg, len, MSG_NOSIGNAL) < 0)
     {
       perror ("Send Fail");
-      log_error ("SEND_ERR: [%d][%p]", errno, flow);
+      log_error ("SEND_ERR: [%p][%d]", flow, errno);
       if (errno == EPIPE || errno == ECONNRESET || errno == ENOTCONN)
         {
           while ((flow->sock = do_connect (flow->ip_dst, flow->port_dst)) == 0)
             {
-              sleep (1);
+              log_error ("FAILED_RECONNECTING: [%p][%d]", flow, flow->sock);
+              break;
+              // sleep (1);
             }
         }
+      break;
     }
 }
 

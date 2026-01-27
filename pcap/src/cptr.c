@@ -38,10 +38,20 @@ loop (char *filter_exp)
       net = 0;
       mask = 0;
     }
-  // pt = pcap_open_live (dev, bufsize, 1, 1000, errbuf);
-  // pt = pcap_open_live ("lo", bufsize, 1, 1000, errbuf);
-  pt = pcap_open_offline ("../test/si.pcapng", errbuf);
 
+  /* rpcap */
+  /* struct pcap_rmtauth auth; */
+  /* memset (&auth, 0, sizeof (auth)); */
+  /* auth.type = RPCAP_RMTAUTH_NULL; */
+  /* auth.username = ""; */
+  /* auth.password = ""; */
+  /* pcap_if_t *alldevs = NULL; */
+  /* pcap_findalldevs_ex ("rpcap://127.0.0.1:2002/", &auth, &alldevs, errbuf); */
+
+  pt = pcap_open_live (dev, bufsize, 1, 1000, errbuf);
+  // pt = pcap_open_live ("lo", bufsize, 1, 1000, errbuf);
+  // pt = pcap_open_live ("rpcap://127.0.0.1:2002/", bufsize, 1, 1000, errbuf);
+  // pt = pcap_open_offline ("../test/si.pcapng", errbuf);
   if (pt == NULL)
     {
       fprintf (stderr, "Could't open D %s: \n", errbuf);
@@ -75,7 +85,7 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
 
   log_debug ("  pkthdr: [%ld.%06ld][%u][%u]",
              (long) h->ts.tv_sec, (long) h->ts.tv_usec, h->caplen, h->len);
-  log_hex ("dequeued: %s", pkt, h->caplen);
+  log_hex ("  pktbdy: %s", pkt, h->caplen);
 
   if (!spsc_enqueue (pkt_que, pkt))
     {

@@ -8,6 +8,8 @@ BLD := ./build
 TST := ./test
 LOG := $(SRC)/log.c
 
+LDFLAGS += -Wl,-rpath,'$$ORIGIN/lib'
+
 SRCS := $(wildcard $(SRC)/*.c)
 # SRCS := $(shell find . -name '*.c')
 OBJS := $(patsubst $(SRC)/%.c,$(BLD)/%.o,$(SRCS))
@@ -26,6 +28,9 @@ $(BLD)/hello: $(SRC)/main.c $(DEPS)
 
 $(BLD)/hello2: $(SRC)/main.c $(DEPS)
 	$(CC) -o $@ $^ -I./src -I. /lib64/libpcap.so.1
+
+$(BLD)/hello3: $(SRC)/main.c $(DEPS)
+	$(CC) $(CFLAGS) -g -o $@ $^ -I. ./libpcap.so.1.9.1 $(LDFLAGS)
 
 $(BLD)/test: $(TST)/test.c $(DEPS)
 	$(CC) -g -o $@ $^ -I. -lpcap

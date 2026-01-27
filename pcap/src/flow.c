@@ -10,8 +10,8 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include "src/log.c/log.h"
-#include "src/packet.h"
+#include "log.c/log.h"
+#include "packet.h"
 
 flow_arr_t *
 flow_arr_init (uint32_t size)
@@ -32,7 +32,7 @@ flow_arr_add (flow_arr_t *fa)
       /* new_flow->flow_cap = flow->flow_cap * 2; */
       /* new_flow->flow_len = flow->flow_len + 1; */
       /* return new_flow; */
-      log_error ("TOO_MUCH_FLOW!");
+      log_error ("TOO_MUCH_FLOW: %u", fa->flow_len);
       return NULL;
     }
   fa->flow_len = fa->flow_len + 1;
@@ -57,7 +57,7 @@ flow_add (flow_arr_t *fa)
       return NULL;
     }
   fa->flow_len = fa->flow_len + 1;
-  log_debug ("  fa_add: %u", fa->flow_len - 1);
+  log_debug ("  fa_add: %u", fa->flow_len);
   return fa->flow + fa->flow_len - 1;
 }
 
@@ -90,6 +90,7 @@ flow_init (flow_t *flow,
   flow->port_dst = dport;
   flow->ip_tar.s_addr = 0;
   flow->port_tar = 0;
+  flow_filename (flow);
 
   flow->next = NULL;
   flow->ts = (struct timespec) { 0 };
@@ -194,7 +195,7 @@ flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp)
   // outside of window
   if (SEQ_LEQ (e, flow->seg_nxt))
     {
-      log_debug ("DISCARD_SEQ_LEQ");
+      log_debug ("DISCARD_OUT_OF_WINDOW");
       return 0;
     }
 
@@ -210,14 +211,14 @@ flow_state_fix_and_pop (flow_t *flow)
   flow_state_t *state = flow->next;
   if (state == NULL || SEQ_LT (flow->seg_nxt, state->seq))
     {
-      log_debug (" NOT_YET: %p", state);
+      log_debug (" NOT_YET: [%p][%p]", flow, state);
       return NULL;
     }
   uint32_t e = state->seq + state->size_payload;
   // outside of window
   if (SEQ_LEQ (e, flow->seg_nxt))
     {
-      log_debug (" DISCARD: %p", state);
+      log_debug (" DISCARD: [%p][%p]", flow, state);
       flow->next = state->next;
       flow->size--;
       flow_state_free (state);
@@ -225,11 +226,11 @@ flow_state_fix_and_pop (flow_t *flow)
     }
   if (SEQ_LT (state->seq, flow->seg_nxt) && SEQ_GT (e, flow->seg_nxt)) // overlap
     {
-      log_debug ("  SLICED: ", state);
+      log_debug ("  SLICED: [%p][%p]", flow, state);
       state->size_payload = e - flow->seg_nxt;
       state->offset_payload = state->offset_payload + flow->seg_nxt - state->seq;
     }
-  log_debug ("     pop: %p", state);
+  log_debug ("     POP: [%p][%p]", flow, state);
   flow->seg_nxt += state->size_payload;
   flow->next = state->next;
   flow->size--;
@@ -268,7 +269,7 @@ flow_state_detach (flow_t *flow, flow_state_t *state)
 flow_state_t *
 flow_state_attach (flow_t *flow, flow_state_t *state)
 {
-  log_debug ("  attach: %p", state);
+  log_debug ("  attach: [%p][%p]", flow, state);
   u_int seq = state->seq;
   clock_gettime (CLOCK_REALTIME, &flow->ts);
   if (flow->next == NULL)
@@ -398,7 +399,7 @@ flow_state_assemble (flow_t *flow, uint8_t *buffer)
 void
 flow_state_free (flow_state_t *fs)
 {
-  log_debug ("    free: %p", fs);
+  log_debug ("    free: [%p][%p]", fs->flow, fs);
   if (fs == NULL)
     return;
   fs->next = NULL;

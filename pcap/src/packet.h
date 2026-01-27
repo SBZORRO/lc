@@ -98,7 +98,8 @@ struct flow_struct
   struct timespec ts;    // last segment ts
   pthread_t thread;      // thread to process flow
   pthread_mutex_t mutex; // attach/detach mutex
-  uint32_t flags;        // tcp flags/thread state
+  // _Atomic int rst_flg;   //
+  uint32_t flags; // tcp flags/thread state
 #define SENDING 0x8000
   int sock;         // fd/socket to send
   FILE *fp;         // Pointer to file storing this flow's data
@@ -111,6 +112,7 @@ struct flow_struct
   uint16_t port_src; /* Source port number */
   uint16_t port_dst; /* Destination port number */
   uint16_t port_tar; /* target server port number */
+  char filename[44];
 };
 
 struct flow_array_struct
