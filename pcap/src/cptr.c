@@ -1,13 +1,12 @@
-#include <pcap.h>
+#include <pcap/pcap.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "flow.h"
 #include "log.c/log.h"
 #include "spsc_queue.h"
-
-int bufsize = 1024 * 1024 * 1024;
 
 extern spsc_queue *pkt_que;
 
@@ -45,9 +44,9 @@ loop (char *filter_exp)
   /* pcap_if_t *alldevs = NULL; */
   /* pcap_findalldevs_ex ("rpcap://127.0.0.1:2002/", &auth, &alldevs, errbuf); */
 
-  pt = pcap_open_live (dev, bufsize, 1, 1000, errbuf);
-  // pt = pcap_open_live ("lo", bufsize, 1, 1000, errbuf);
-  // pt = pcap_open_live ("rpcap://127.0.0.1:2002/", bufsize, 1, 1000, errbuf);
+  pt = pcap_open_live (dev, CPTR_BUF_SIZE, 1, 1000, errbuf);
+  // pt = pcap_open_live ("lo", CPTR_BUF_SIZE, 1, 1000, errbuf);
+  // pt = pcap_open_live ("rpcap://127.0.0.1:2002/", CPTR_BUF_SIZE, 1, 1000, errbuf);
   // pt = pcap_open_offline ("../test/si.pcapng", errbuf);
   if (pt == NULL)
     {
@@ -77,7 +76,7 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
 {
   /* spsc_queue *q = (spsc_queue *) user; */
 
-  u_char *pkt = check_malloc (h->caplen);
+  uint8_t *pkt = MALLOC (uint8_t, h->caplen);
   memcpy (pkt, p, h->caplen);
 
   log_debug ("  pkthdr: [%ld.%06ld][%u][%u]",

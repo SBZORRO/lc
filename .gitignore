@@ -1,3 +1,4 @@
 /pcap/.cache/
 /pcap/build/*
 /pcap/build/
+/.cache/

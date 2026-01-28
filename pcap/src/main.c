@@ -1,5 +1,4 @@
 #define _GNU_SOURCE
-#include <pcap.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -15,14 +14,11 @@
 /* 10.160.16.157 */
 /* 4001-4008 */
 /* dst host 10.160.16.157 and tcp dst portrange 4001-4008 */
-char *filter_exp = "dst host 45.63.92.159"; /* The filter expression */
+char *filter_exp = "tcp"; /* The filter expression */
 
 flow_arr_t *fa; // flow array
-#define FLOW_PTR_CAP 1024
 
 spsc_queue *pkt_que;
-// 2^n
-#define PKT_QUE_CAP 256 * 1024 * 1024
 
 /* servos */
 /* servou */
@@ -115,7 +111,7 @@ th_dispatch_flow (void *arg)
 
   while (1)
     {
-      u_char *p = NULL;
+      uint8_t *p = NULL;
 
       if (!spsc_dequeue (q, (void **) &p))
         {
@@ -251,7 +247,7 @@ main (int argc, char *argv[])
   pkt_que = spsc_init (PKT_QUE_CAP);
   log_debug ("pkt_que: %p", pkt_que);
 
-  fa = flow_arr_init (FLOW_PTR_CAP);
+  fa = flow_arr_init (FLOW_ARR_CAP);
   log_debug ("flow_ptr: %p", fa);
 
   // reentrant lock

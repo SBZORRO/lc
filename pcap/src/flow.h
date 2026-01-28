@@ -1,4 +1,5 @@
 #pragma once
+#include <pcap/pcap.h>
 #ifndef _WIN32
 # include <string.h>
 #endif
@@ -7,11 +8,27 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include <pcap.h>
 #include "packet.h"
+
+#define FLOW_ARR_CAP 1024
+// 2^n
+#define PKT_QUE_CAP 256 * 1024 * 1024
+
+#define CPTR_BUF_SIZE 256 * 1024 * 1024
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#define HASH_SIZE 0
+#define HASH_FLOW(flow)                                      \
+  (((flow.sport & 0xff) | ((flow.dport & 0xff) << 8)         \
+    | ((flow.src & 0xff) << 16) | ((flow.dst & 0xff) << 24)) \
+   % HASH_SIZE)
+
+#define SEQ_LT(a, b) ((int32_t) ((a) - (b)) < 0)
+#define SEQ_LEQ(a, b) ((int32_t) ((a) - (b)) <= 0)
+#define SEQ_GT(a, b) ((int32_t) ((a) - (b)) > 0)
+#define SEQ_GEQ(a, b) ((int32_t) ((a) - (b)) >= 0)
 
 #define make_filter(ip, p) (src host ip and src port p)
 

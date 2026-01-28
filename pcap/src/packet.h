@@ -81,10 +81,6 @@ struct sniff_tcp
   u_short th_urp; /* urgent pointer */
 };
 
-#ifndef CACHELINE
-# define CACHELINE 64
-#endif
-
 typedef struct flow_struct flow_t;
 typedef struct flow_state_struct flow_state_t;
 typedef struct flow_array_struct flow_arr_t;
@@ -130,14 +126,3 @@ struct flow_array_struct
   uint32_t flow_cap;
   flow_t flow[];
 };
-
-#define HASH_SIZE 0
-#define HASH_FLOW(flow)                                      \
-  (((flow.sport & 0xff) | ((flow.dport & 0xff) << 8)         \
-    | ((flow.src & 0xff) << 16) | ((flow.dst & 0xff) << 24)) \
-   % HASH_SIZE)
-
-#define SEQ_LT(a, b) ((int32_t) ((a) - (b)) < 0)
-#define SEQ_LEQ(a, b) ((int32_t) ((a) - (b)) <= 0)
-#define SEQ_GT(a, b) ((int32_t) ((a) - (b)) > 0)
-#define SEQ_GEQ(a, b) ((int32_t) ((a) - (b)) >= 0)
