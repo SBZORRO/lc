@@ -266,7 +266,7 @@ flow_state_t *
 flow_state_attach (flow_t *flow, flow_state_t *state)
 {
   log_debug ("  attach: [%p][%p]", flow, state);
-  u_int seq = state->seq;
+  uint32_t seq = state->seq;
   clock_gettime (CLOCK_REALTIME, &flow->ts);
   if (flow->next == NULL)
     {
@@ -277,10 +277,15 @@ flow_state_attach (flow_t *flow, flow_state_t *state)
   else
     {
       flow_state_t *ptr = flow->next;
-      /* dup packet use new */
+      /* dup packet use long */
       if (seq == ptr->seq)
         {
-          flow->next = state;
+          if (state->size_payload > ptr->size_payload)
+            {
+              state->next = ptr->next;
+              flow->next = state;
+              flow_state_free (ptr);
+            }
           return state;
         }
       /* retrans packet */
@@ -296,13 +301,18 @@ flow_state_attach (flow_t *flow, flow_state_t *state)
       ptr = prev->next;
       while (ptr != NULL)
         {
-          /* dup packet use new */
+          /* dup packet use long */
           if (seq == ptr->seq)
             {
-              state->next = ptr->next;
-              prev->next = state;
+              if (state->size_payload > ptr->size_payload)
+                {
+                  state->next = ptr->next;
+                  prev->next = state;
+                  flow_state_free (ptr);
+                }
               return state;
             }
+
           /* retrans packet */
           if (SEQ_LT (seq, ptr->seq))
             {
@@ -395,7 +405,7 @@ flow_state_assemble (flow_t *flow, uint8_t *buffer)
 void
 flow_state_free (flow_state_t *fs)
 {
-  log_debug ("    free: [%p][%p]", fs->flow, fs);
+  log_trace ("    free: [%p][%p]", fs->flow, fs);
   if (fs == NULL)
     return;
   fs->next = NULL;

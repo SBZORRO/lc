@@ -8,9 +8,7 @@
 #include "../src/packet.h"
 #include "../src/spsc_queue.h"
 
-spsc_queue *pkt_que;
-// 2^n
-#define PKT_QUE_CAP 65536
+extern spsc_queue *pkt_que;
 
 char filter[] = "((src host 10.160.231.153 and src port 9997) or (dst host 10.160.231.152 and dst port 9998))";
 char *addrs[]
@@ -353,6 +351,29 @@ test_flow_state_attach2 ()
   EXPECT_EQ_BASE (ptr->next == NULL, NULL, ptr->next, "%p");
 }
 
+void
+test_flow_state_attach3 ()
+{
+  printf ("test_flow_state_attach3\n");
+  flow_t flow;
+  flow_t *ptr = &flow;
+  flow_init (ptr, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+
+  CREATE_AND_ATTACH (ptr, 123, 3, "123");
+  CREATE_AND_ATTACH (ptr, 123, 2, "12");
+  CREATE_AND_ATTACH (ptr, 921034, 7, "1234567");
+  CREATE_AND_ATTACH (ptr, 154, 1, " ");
+  CREATE_AND_ATTACH (ptr, 154, 3, "123");
+  CREATE_AND_ATTACH (ptr, 321, 9, "abger0[g]");
+  CREATE_AND_ATTACH (ptr, 983, 3, "123");
+  CREATE_AND_ATTACH (ptr, 298346, 7, "       ");
+  CREATE_AND_ATTACH (ptr, 123, 6, "456789");
+  CREATE_AND_ATTACH (ptr, 983, 4, "abcd");
+
+  flow_state_print(ptr);
+  EXPECT_EQ_INT (6, ptr->size);
+}
+
 const char *test[] = { "test1", "Hello", "WORLD!", "\x1b", "*2A", NULL };
 
 void
@@ -535,6 +556,7 @@ main (int argc, char *argv[])
 {
   test_flow_state_attach ();
   test_flow_state_attach2 ();
+  test_flow_state_attach3 ();
   test_flow_state_pkt_slice ();
   test_flow_state_attach_partially ();
   test_flow_state_attach_retrans ();

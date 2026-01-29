@@ -93,6 +93,11 @@ void logger_destory ();
 void *check_malloc (size_t size);
 void *check_realloc (void *ptr, size_t size);
 
+/* handler.c */
+void *th_send_flow (void *f);
+void *th_dispatch_flow (void *arg);
+void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
+
 #define filename(src, sp, dst, dp)               \
   (uint8_t) ((src.s_addr & 0xff000000) >> 24),   \
     (uint8_t) ((src.s_addr & 0x00ff0000) >> 16), \

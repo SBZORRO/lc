@@ -1,14 +1,8 @@
 #include <pcap/pcap.h>
 #include <pthread.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "flow.h"
 #include "log.c/log.h"
-#include "spsc_queue.h"
-
-extern spsc_queue *pkt_que;
 
 int
 loop (char *filter_exp)
@@ -55,38 +49,16 @@ loop (char *filter_exp)
 
   if (pcap_compile (pt, &fp, filter_exp, 0, net) == -1)
     {
-      fprintf (stderr, "Couldn't parse filter %s: %s\n", filter_exp,
-               pcap_geterr (pt));
+      fprintf (stderr, "Couldn't parse filter %s: %s\n", filter_exp, pcap_geterr (pt));
       return (2);
     }
   if (pcap_setfilter (pt, &fp) == -1)
     {
-      fprintf (stderr, "Couldn't install filter %s: %s\n", filter_exp,
-               pcap_geterr (pt));
+      fprintf (stderr, "Couldn't install filter %s: %s\n", filter_exp, pcap_geterr (pt));
       return (2);
     }
 
   log_debug ("LOOPPING");
   pcap_loop (pt, -1, handler, NULL);
   return 0;
-}
-
-void
-dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
-{
-  /* spsc_queue *q = (spsc_queue *) user; */
-
-  uint8_t *pkt = MALLOC (uint8_t, h->caplen);
-  memcpy (pkt, p, h->caplen);
-
-  log_debug ("  pkthdr: [%ld.%06ld][%u][%u]",
-             (long) h->ts.tv_sec, (long) h->ts.tv_usec, h->caplen, h->len);
-  log_hex ("  pktbdy: %s", pkt, h->caplen);
-
-  if (!spsc_enqueue (pkt_que, pkt))
-    {
-      log_warn ("spsc_discard: [%u][%u][%u]",
-                pkt_que->head, pkt_que->tail, pkt_que->capacity);
-      free (pkt);
-    }
 }
