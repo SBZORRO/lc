@@ -7,14 +7,14 @@ pthread_mutex_t MUTEX_LOG;
 void log_lock (bool lock, void *udata);
 
 void
-init_logger (FILE *fp)
+init_logger (FILE *fp, int lvl)
 {
-  log_set_level (LOG_DEBUG);
+  log_set_level (lvl);
   log_set_quiet (0);
 
-  // init_logger_lock ();
+  init_logger_lock ();
 
-  int id = log_add_fp (fp, LOG_DEBUG);
+  int id = log_add_fp (fp, lvl);
 }
 
 int

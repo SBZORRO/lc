@@ -28,13 +28,13 @@
 typedef struct
 {
   log_LogFn fn;
-  void *udata; // fp
+  void *fp; // fp
   int level;
 } Callback;
 
 static struct
 {
-  void *udata; // mutex
+  void *mutex; // mutex
   log_LockFn lock;
   int level;
   bool quiet;
@@ -63,7 +63,7 @@ stdout_callback (log_Event *ev)
     ev->file, ev->line);
 #else
   fprintf (
-    ev->udata, "%s %-5s %11s:%-3d: ",
+    ev->udata, "%s %-5s %15s:%03d: ",
     buf, level_strings[ev->level], ev->file, ev->line);
 #endif
   vfprintf (ev->udata, ev->fmt, ev->ap);
@@ -89,7 +89,7 @@ lock (void)
 {
   if (L.lock)
     {
-      L.lock (true, L.udata);
+      L.lock (true, L.mutex);
     }
 }
 
@@ -98,7 +98,7 @@ unlock (void)
 {
   if (L.lock)
     {
-      L.lock (false, L.udata);
+      L.lock (false, L.mutex);
     }
 }
 
@@ -112,7 +112,7 @@ void
 log_set_lock (log_LockFn fn, void *udata)
 {
   L.lock = fn;
-  L.udata = udata;
+  L.mutex = udata;
 }
 
 void
@@ -183,7 +183,7 @@ log_log (int level, const char *file, int line, const char *fmt, ...)
       Callback *cb = &L.callbacks[i];
       if (level >= cb->level)
         {
-          init_event (&ev, cb->udata);
+          init_event (&ev, cb->fp);
           va_start (ev.ap, fmt);
           cb->fn (&ev);
           va_end (ev.ap);
@@ -216,9 +216,9 @@ log_log_fp (FILE *fp, int level, const char *file, int line, const char *fmt, ..
   for (int i = 0; i < MAX_CALLBACKS && L.callbacks[i].fn; i++)
     {
       Callback *cb = &L.callbacks[i];
-      if (level >= cb->level && fp == cb->udata)
+      if (level >= cb->level && fp == cb->fp)
         {
-          init_event (&ev, cb->udata);
+          init_event (&ev, cb->fp);
           va_start (ev.ap, fmt);
           cb->fn (&ev);
           va_end (ev.ap);
@@ -251,7 +251,7 @@ log_log_id (int id, int level, const char *file, int line, const char *fmt, ...)
   Callback *cb = &L.callbacks[id];
   if (level >= cb->level)
     {
-      init_event (&ev, cb->udata);
+      init_event (&ev, cb->fp);
       va_start (ev.ap, fmt);
       cb->fn (&ev);
       va_end (ev.ap);

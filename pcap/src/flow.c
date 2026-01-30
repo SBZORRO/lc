@@ -32,7 +32,7 @@ flow_arr_add (flow_arr_t *fa)
       return NULL;
     }
   fa->flow_len = fa->flow_len + 1;
-  log_debug ("flow_arr_add: %u", fa->flow_len);
+  log_trace ("flow_arr_add: %u", fa->flow_len);
   return fa;
 }
 
@@ -46,14 +46,14 @@ flow_add (flow_arr_t *fa)
           flow_t f = fa->flow[i];
           if (f.ip_src.s_addr == 0)
             {
-              log_debug ("fa_reuse: %u", i);
+              log_trace ("fa_reuse: %u", i);
               return &fa->flow[i];
             }
         }
       return NULL;
     }
   fa->flow_len = fa->flow_len + 1;
-  log_debug ("  fa_add: %u", fa->flow_len);
+  log_trace ("  fa_add: %u", fa->flow_len);
   return fa->flow + fa->flow_len - 1;
 }
 
@@ -124,6 +124,7 @@ flow_reset (flow_t *flow)
   flow->port_dst = 0;
   flow->ip_tar.s_addr = 0;
   flow->port_tar = 0;
+  flow->filename[0] = '\0'; // make it an empty string
 
   flow->next = NULL;
   flow->ts = (struct timespec) { 0 };
@@ -158,7 +159,7 @@ flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp)
       flow->flags = thread_bits | tcp_bits;
       flow->seg_nxt = seq + 1;
       seq++; // SEQ_LEQ
-      log_debug ("SYN");
+      log_trace ("SYN");
       // return 1; // init seg_nxt seq
     }
   else if (th_flags & TH_RST) // receive RST
@@ -166,24 +167,24 @@ flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp)
       flow_reset (flow);
       tcp_bits = TH_RST; // reset tcp bits
       flow->flags = thread_bits | tcp_bits;
-      log_debug ("RST");
+      log_trace ("RST");
       return 0;
     }
   else if (tcp_bits & TH_RST) // 丢包直到 SYN
     {
       flow->flags = thread_bits | tcp_bits;
-      log_debug ("DISCARD_RST");
+      log_trace ("DISCARD_RST");
       return 0;
     }
   else if (flow->seg_nxt == 0)
     {
       flow->seg_nxt = seq;
-      log_debug ("SEG_NXT");
+      log_trace ("SEG_NXT");
     }
 
   if (sp == 0)
     {
-      log_debug ("DISCARD_SIZE_0");
+      log_trace ("DISCARD_SIZE_0");
       return 0;
     }
 
@@ -191,7 +192,7 @@ flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp)
   // outside of window
   if (SEQ_LEQ (e, flow->seg_nxt))
     {
-      log_debug ("DISCARD_OUT_OF_WINDOW");
+      log_trace ("DISCARD_OUT_OF_WINDOW");
       return 0;
     }
 
@@ -207,14 +208,14 @@ flow_state_fix_and_pop (flow_t *flow)
   flow_state_t *state = flow->next;
   if (state == NULL || SEQ_LT (flow->seg_nxt, state->seq))
     {
-      log_debug (" NOT_YET: [%p][%p]", flow, state);
+      log_trace (" NOT_YET: [%p][%p]", flow, state);
       return NULL;
     }
   uint32_t e = state->seq + state->size_payload;
   // outside of window
   if (SEQ_LEQ (e, flow->seg_nxt))
     {
-      log_debug (" DISCARD: [%p][%p]", flow, state);
+      log_trace (" DISCARD: [%p][%p]", flow, state);
       flow->next = state->next;
       flow->size--;
       flow_state_free (state);
@@ -222,11 +223,10 @@ flow_state_fix_and_pop (flow_t *flow)
     }
   if (SEQ_LT (state->seq, flow->seg_nxt) && SEQ_GT (e, flow->seg_nxt)) // overlap
     {
-      log_debug ("  SLICED: [%p][%p]", flow, state);
+      log_trace ("  SLICED: [%p][%p]", flow, state);
       state->size_payload = e - flow->seg_nxt;
       state->offset_payload = state->offset_payload + flow->seg_nxt - state->seq;
     }
-  log_debug ("     POP: [%p][%p]", flow, state);
   flow->seg_nxt += state->size_payload;
   flow->next = state->next;
   flow->size--;
@@ -265,7 +265,6 @@ flow_state_detach (flow_t *flow, flow_state_t *state)
 flow_state_t *
 flow_state_attach (flow_t *flow, flow_state_t *state)
 {
-  log_debug ("  attach: [%p][%p]", flow, state);
   uint32_t seq = state->seq;
   clock_gettime (CLOCK_REALTIME, &flow->ts);
   if (flow->next == NULL)
@@ -331,7 +330,7 @@ flow_state_attach (flow_t *flow, flow_state_t *state)
 }
 
 flow_state_t *
-flow_state_create (flow_t *flow, u_int seq, u_int ack, u_int flags, u_int size_payload, u_int offset_payload, u_char *pkt)
+flow_state_create (flow_t *flow, uint32_t seq, uint32_t ack, uint32_t flags, uint32_t size_payload, uint32_t offset_payload, uint8_t *pkt)
 {
   flow_state_t *new_flow_state = MALLOC (flow_state_t, 1);
   new_flow_state->next = NULL;
@@ -347,17 +346,20 @@ flow_state_create (flow_t *flow, u_int seq, u_int ack, u_int flags, u_int size_p
 }
 
 void
-flow_print (flow_t *flow, uint32_t len)
+flow_print (flow_t *f)
 {
-  for (uint32_t i = 0; i < len; i++)
-    {
-      flow_t *f = &flow[i];
-      printf ("FLOW: %u\n", i);
-      printf ("  From: %s:%u\n", inet_ntoa (f->ip_src), ntohs (f->port_src));
-      printf ("    To: %s:%u\n", inet_ntoa (f->ip_dst), ntohs (f->port_dst));
-      printf ("  next: %p\n", f->next);
-      printf ("   nxt: %u\n", f->seg_nxt);
-    }
+  printf ("FLOW: \n");
+  printf ("  From: %s:%u\n", inet_ntoa (f->ip_src), ntohs (f->port_src));
+  printf ("    To: %s:%u\n", inet_ntoa (f->ip_dst), ntohs (f->port_dst));
+  printf ("  next: %p\n", f->next);
+  printf ("   nxt: %u\n", f->seg_nxt);
+  printf ("  size: %u\n", f->size);
+  printf ("  flag: %u\n", f->flags);
+  printf ("  name: %s\n", f->filename);
+  printf ("  time: %lu\n", f->ts.tv_nsec);
+  printf ("  thrd: %lu\n", f->thread);
+  printf ("  sock: %d\n", f->sock);
+  printf ("  file: %p\n", f->fp);
 }
 
 void
@@ -366,11 +368,25 @@ flow_state_print (flow_t *flow)
   flow_state_t *ptr = flow->next;
   while (ptr != NULL)
     {
-      for (uint32_t i = 0; i < ptr->size_payload; ++i)
+      for (size_t i = ptr->offset_payload; i < ptr->offset_payload + ptr->size_payload; i++)
         {
           printf ("%c", ptr->pkt[i]);
         }
-      // printf ("%u\n", ptr->len);
+      ptr = ptr->next;
+    }
+  printf ("\n");
+}
+
+void
+flow_state_print_hex (flow_t *flow)
+{
+  flow_state_t *ptr = flow->next;
+  while (ptr != NULL)
+    {
+      for (size_t i = ptr->offset_payload; i < ptr->offset_payload + ptr->size_payload; i++)
+        {
+          printf ("%02x ", ptr->pkt[i]);
+        }
       ptr = ptr->next;
     }
   printf ("\n");
@@ -393,10 +409,6 @@ flow_state_assemble (flow_t *flow, uint8_t *buffer)
     {
       memcpy (buffer + i, state->pkt + state->offset_payload, state->size_payload);
       i = i + state->size_payload;
-      /* for (int i = 0; i < state->size_payload; ++i) */
-      /*   { */
-      /*     printf ("%c", state->pkt[i]); */
-      /*   } */
       state = state->next;
     }
   return i;
@@ -418,6 +430,7 @@ flow_state_free (flow_state_t *fs)
   free (fs);
 }
 
+/* protocol section */
 const char *servos_requ[] = { "\x1b", "HO", "RCTY1C", "RSEN0A", "SDADS", "SDADE", "SDADC", "SDADB", "RSTI1C", "SSMP0202F", "RADC14", NULL };
 const char *servos_resp[] = { "900PCI", "Servo-s0", "Servo-i0", "Servo-s1", "Servo-i1", NULL };
 

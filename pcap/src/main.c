@@ -26,14 +26,14 @@ main (int argc, char *argv[])
     {
       return -1;
     }
-  init_logger (fp);
-  log_debug ("Hello World!");
+  init_logger (fp, LOG_DEBUG);
+  log_info ("Hello World!");
 
   pkt_que = spsc_init (PKT_QUE_CAP);
-  log_debug ("pkt_que: %p", pkt_que);
+  log_info ("pkt_que: %p", pkt_que);
 
   fa = flow_arr_init (FLOW_ARR_CAP);
-  log_debug ("flow_ptr: %p", fa);
+  log_info ("flow_ptr: %p", fa);
 
   // reentrant lock
   pthread_mutexattr_t attr;
@@ -44,11 +44,11 @@ main (int argc, char *argv[])
 
   pthread_t tht_dispatch_flow;
   pthread_create (&tht_dispatch_flow, NULL, th_dispatch_flow, (void *) pkt_que);
-  log_debug ("tht_dispatch_flow: %u", tht_dispatch_flow);
+  log_info ("tht_dispatch_flow: %u", tht_dispatch_flow);
 
   // block
   filter_exp = argv[1] == NULL ? filter_exp : argv[1];
-  log_debug ("filter_exp: %s", filter_exp);
+  log_info ("filter_exp: %s", filter_exp);
   loop (filter_exp);
 
   pthread_exit (NULL);

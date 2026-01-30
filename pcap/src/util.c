@@ -55,7 +55,7 @@ print_hex (const u_char *buf, size_t len)
 const char hex[] = "0123456789ABCDEF";
 
 void
-log_hex (const char *fmt, const uint8_t *buf, size_t len)
+log_hex (int lvl, const char *fmt, const uint8_t *buf, size_t len)
 {
   char *o = (char *) MALLOC (uint8_t, len * 2 + 1);
   for (size_t i = 0, j = 0; j < len; i = i + 2, j++)
@@ -64,7 +64,7 @@ log_hex (const char *fmt, const uint8_t *buf, size_t len)
       o[i + 1] = hex[buf[j] & 0x0F];
     }
   o[len * 2] = 0;
-  log_debug (fmt, o);
+  log_log(lvl, __FILE__, __LINE__, fmt, o);
   free (o);
 }
 

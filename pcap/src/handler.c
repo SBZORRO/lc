@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-#include <netinet/in.h>
 #include <pcap/pcap.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -27,9 +25,6 @@ void *
 th_send_flow (void *f)
 {
   flow_t *flow = (flow_t *) f;
-  int rc = pthread_setname_np (pthread_self (), "send_flow");
-  if (rc != 0)
-    log_debug ("th_sendflow_setname: %s\n", strerror (rc));
   int rst = 0;
   while (1)
     {
@@ -42,13 +37,13 @@ th_send_flow (void *f)
           if (rst++ > 60)
             {
               pthread_mutex_lock (&air_mutex);
-
               pthread_mutex_lock (&flow->mutex);
               state = flow_state_fix_and_pop (flow);
               pthread_mutex_unlock (&flow->mutex);
               if (state == NULL && rst++ > 60)
                 {
                   flow_reset (flow);
+                  log_info ("RST_FLOW: [%p]", flow);
                 }
               pthread_mutex_unlock (&air_mutex);
               break;
@@ -58,8 +53,11 @@ th_send_flow (void *f)
         }
       rst = 0;
 
+      log_debug ("POP_STAT: [%p][%p]", flow, state);
+
       /* write the data into the file */
-      size_t sw = fwrite ((char *) state->pkt + state->offset_payload, (size_t) state->size_payload, 1, flow->fp);
+      flow->fp = fopen (flow->filename, "ab");
+      size_t sw = fwrite ((char *) state->pkt + state->offset_payload, 1, (size_t) state->size_payload, flow->fp);
       if (sw != state->size_payload)
         {
           perror ("fwrite");
@@ -67,26 +65,28 @@ th_send_flow (void *f)
           // DEBUG (1) ("write to %s failed: ", flow_filename (state->flow));
         }
       fflush (flow->fp);
-      log_debug (" writing: [%p][%p][%u][%u]", flow, state, state->seq, sw);
+      fclose (flow->fp);
+      log_trace ("   wrote: [%p][%p][%u][%u]", flow, state, state->seq, sw);
 
       if (flow->sock <= 0)
         {
           int res = detect (state);
-          log_debug ("detected: [%p][%p][%u][%d]", flow, state, state->seq, res);
           if (res == 0)
             {
               flow_state_free (state);
               continue;
             }
+          log_info ("DETECTED: [%p][%p][%u][%d]", flow, state, state->seq, res);
           SET_IP (flow, tar, server[res]);
           while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) <= 0)
             {
-              log_error ("FAILED_CONNECTING: [%p][%d]", flow, flow->sock);
+              log_warn ("FAILED_CONNECTING: [%p][%d]", flow, flow->sock);
               break;
               // sleep (1);
             }
+          log_info ("CONECTED: [%p][%p][%u][%d]", flow, state, state->seq, flow->sock);
         }
-      log_debug (" sending: [%p][%p][%u]", flow, state, state->seq);
+      log_trace (" sending: [%p][%p][%u]", flow, state, state->seq);
       do_sent (flow, (char *) state->pkt + state->offset_payload, (size_t) state->size_payload);
 
       flow_state_free (state);
@@ -98,13 +98,7 @@ th_send_flow (void *f)
 void *
 th_dispatch_flow (void *arg)
 {
-  //  prctl (PR_SET_NAME, "main-thread", 0, 0, 0);
-  int rc = pthread_setname_np (pthread_self (), "dispatch_flow");
-  if (rc != 0)
-    log_debug ("th_dispatch_setname: %s\n", strerror (rc));
-
   spsc_queue *q = (spsc_queue *) arg;
-
   while (1)
     {
       uint8_t *p = NULL;
@@ -134,7 +128,7 @@ th_dispatch_flow (void *arg)
       size_ip = IP_HL (ip) * 4;
       if (size_ip < 20)
         {
-          log_error ("Invalid_IP_header_length: %u\n", size_ip);
+          log_warn ("Invalid_IP_header_length: %u\n", size_ip);
           free (p);
           continue;
         }
@@ -143,7 +137,7 @@ th_dispatch_flow (void *arg)
       size_tcp = TH_OFF (tcp) * 4;
       if (size_tcp < 20)
         {
-          log_error ("Invalid_TCP_ header_length: %u\n", size_tcp);
+          log_warn ("Invalid_TCP_ header_length: %u\n", size_tcp);
           free (p);
           continue;
         }
@@ -160,8 +154,8 @@ th_dispatch_flow (void *arg)
                 "[%u][%u][%u][%u][%u]",
                 filename (ip->ip_src, tcp->th_sport, ip->ip_dst, tcp->th_dport),
                 seq, ack, flags, offset_payload, size_payload);
-      log_hex ("HPAYLOAD: %s", payload, size_payload);
-      log_debug ("APAYLOAD: %.*s", size_payload, payload);
+      log_hex (LOG_INFO, "HPAYLOAD: %s", payload, size_payload);
+      log_info ("APAYLOAD: %.*s", size_payload, payload);
 
       /*
        * lock
@@ -180,7 +174,7 @@ th_dispatch_flow (void *arg)
               continue;
             }
           flow_init (flow, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
-          log_debug (
+          log_info (
             "NEW_FLOW: [%p][%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d]",
             flow,
             filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
@@ -195,20 +189,20 @@ th_dispatch_flow (void *arg)
         }
 
       flow_state_t *state = flow_state_create (flow, seq, ack, flags, size_payload, offset_payload, p);
-      log_debug ("NEW_STAT: [%p][%p][%u]", flow, state, seq);
       pthread_mutex_lock (&flow->mutex);
       flow_state_attach (flow, state);
       pthread_mutex_unlock (&flow->mutex);
+      log_debug ("NEW_STAT: [%p][%p][%u]", flow, state, seq);
 
       if (!(flow->flags & SENDING))
         {
-          char *name = flow_filename (flow);
-          if (flow->fp == NULL)
-            {
-              flow->fp = fopen (name, "ab");
-            }
+          /* char *name = flow_filename (flow); */
+          /* if (flow->fp == NULL) */
+          /*   { */
+          /*     flow->fp = fopen (name, "ab"); */
+          /*   } */
           flow->flags = flow->flags | SENDING;
-          log_debug (
+          log_info (
             "NEW_THRD: [%p][%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d]",
             flow,
             filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
@@ -231,9 +225,9 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
   uint8_t *pkt = MALLOC (uint8_t, h->caplen);
   memcpy (pkt, p, h->caplen);
 
-  log_debug ("  pkthdr: [%ld.%06ld][%u][%u]",
-             (long) h->ts.tv_sec, (long) h->ts.tv_usec, h->caplen, h->len);
-  log_hex ("  pktbdy: %s", pkt, h->caplen);
+  log_info ("  pkthdr: [%ld.%06ld][%u][%u]",
+            (long) h->ts.tv_sec, (long) h->ts.tv_usec, h->caplen, h->len);
+  log_hex (LOG_INFO, "  pktbdy: %s", pkt, h->caplen);
 
   if (!spsc_enqueue (pkt_que, pkt))
     {

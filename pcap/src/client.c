@@ -26,7 +26,7 @@ do_sent (flow_t *flow, char *msg, size_t len)
         {
           while ((flow->sock = do_connect (flow->ip_dst, flow->port_dst)) == 0)
             {
-              log_error ("FAILED_RECONNECTING: [%p][%d]", flow, flow->sock);
+              log_warn ("FAILED_RECONNECTING: [%p][%d]", flow, flow->sock);
               break;
               // sleep (1);
             }
@@ -67,8 +67,6 @@ do_connect (struct in_addr ip, u_short port)
       perror ("Connection failed");
       return sock;
     }
-
-  printf ("Connection Start\n");
 
   /* send (sock, "Hello from client", strlen ("Hello from client"), 0); */
   /* int valread = read (sock, buffer, BUFFER_SIZE); */

@@ -58,7 +58,7 @@ loop (char *filter_exp)
       return (2);
     }
 
-  log_debug ("LOOPPING");
+  log_info ("LOOPPING");
   pcap_loop (pt, -1, handler, NULL);
   return 0;
 }

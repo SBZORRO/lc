@@ -50,28 +50,29 @@
 
 /* client.c */
 void do_sent (flow_t *flow, char *msg, size_t len);
-int do_connect (struct in_addr sin_addr, u_short sin_port);
+int do_connect (struct in_addr sin_addr, uint16_t sin_port);
 
 /* cptr.c */
 int loop (char *filter_exp);
-void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
+void dl_ethernet (uint8_t *user, const struct pcap_pkthdr *h, const uint8_t *p);
 
 /* flow.c */
-flow_state_t *flow_state_create (flow_t *flow, u_int seq, u_int ack, u_int flags, u_int size_payload, u_int offset_payload, u_char *pkt);
+flow_state_t *flow_state_create (flow_t *flow, uint32_t seq, uint32_t ack, uint32_t flags, uint32_t size_payload, uint32_t offset_payload, uint8_t *pkt);
 flow_state_t *flow_state_attach (flow_t *flow, flow_state_t *new_flow_state);
 flow_state_t *flow_state_detach (flow_t *flow, flow_state_t *new_flow_state);
 flow_state_t *flow_state_fix_and_pop (flow_t *flow);
 
 uint32_t flow_state_assemble (flow_t *flow, uint8_t *buffer);
 void flow_state_print (flow_t *flow);
+void flow_state_print_hex (flow_t *flow);
 void flow_state_free (flow_state_t *fs);
 
-void flow_print (flow_t *flow, u_int len);
+void flow_print (flow_t *flow);
 flow_t *flow_set_dst (flow_t *flow, char *dst_addr);
 flow_t *flow_set_src (flow_t *flow, char *src_addr);
 void flow_reset (flow_t *flow);
-flow_t *flow_init (flow_t *flow, const struct in_addr src, const struct in_addr dst, const u_short sport, const u_short dport);
-flow_t *flow_find (flow_arr_t *fa, struct in_addr src, struct in_addr dst, u_short sport, u_short dport);
+flow_t *flow_init (flow_t *flow, const struct in_addr src, const struct in_addr dst, const uint16_t sport, const uint16_t dport);
+flow_t *flow_find (flow_arr_t *fa, struct in_addr src, struct in_addr dst, uint16_t sport, uint16_t dport);
 uint32_t flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp);
 flow_t *flow_add (flow_arr_t *fa);
 
@@ -82,7 +83,7 @@ int contain (uint8_t *str, uint32_t len, const char **targets);
 int detect (flow_state_t *state);
 
 /* logger.c */
-void init_logger (FILE *fp);
+void init_logger (FILE *fp, int lvl);
 int init_logger_lock ();
 void log_lock (bool lock, void *udata);
 void logger_destory ();
@@ -96,7 +97,7 @@ void *check_realloc (void *ptr, size_t size);
 /* handler.c */
 void *th_send_flow (void *f);
 void *th_dispatch_flow (void *arg);
-void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
+void dl_ethernet (uint8_t *user, const struct pcap_pkthdr *h, const uint8_t *p);
 
 #define filename(src, sp, dst, dp)               \
   (uint8_t) ((src.s_addr & 0xff000000) >> 24),   \
@@ -112,8 +113,8 @@ void dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p);
 
 #define RING_SIZE 1024
 char *flow_filename (flow_t *flow);
-void log_hex (const char *fmt, const u_char *buf, size_t len);
-void print_hex (const u_char *buf, size_t len);
+void log_hex (int lvl, const char *fmt, const uint8_t *buf, size_t len);
+void print_hex (const uint8_t *buf, size_t len);
 
 void init_debug (char *argv[]);
 #define DEBUG(message_level)        \
