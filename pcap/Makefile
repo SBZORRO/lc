@@ -40,6 +40,9 @@ $(BLD)/wintest: $(TST)/test.c $(DEPS)
 $(BLD)/test: $(TST)/test.c $(DEPS)
 	$(CC) -g -o $@ $^ -I. -lpcap
 
+$(BLD)/pool_test: $(TST)/pool_test.c $(SRC)/pool.c $(SRC)/pool.h
+	$(CC) $(CFLAGS) -g -o $@ $(TST)/pool_test.c $(SRC)/pool.c -I. -pthread
+
 $(BLD)/hello.so: $(SRC)/main.c
 	$(CC) -shared -fPIC -o $@ $< -lpcap
 
