@@ -1,12 +1,106 @@
 #include <errno.h>
-#include <fcntl.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+#ifndef _WIN32
+# include <unistd.h>
+#endif
 #include "flow.h"
 #include "log.c/log.h"
 #include "packet.h"
+
+#ifdef _WIN32
+static int winsock_initialized = 0;
+
+int
+flow_net_init (void)
+{
+  if (winsock_initialized)
+    return 0;
+
+  WSADATA wsa_data;
+  int rc = WSAStartup (MAKEWORD (2, 2), &wsa_data);
+  if (rc != 0)
+    {
+      errno = rc;
+      return -1;
+    }
+
+  winsock_initialized = 1;
+  atexit (flow_net_cleanup);
+  return 0;
+}
+
+void
+flow_net_cleanup (void)
+{
+  if (winsock_initialized)
+    {
+      WSACleanup ();
+      winsock_initialized = 0;
+    }
+}
+
+static int
+flow_socket_errno (void)
+{
+  return WSAGetLastError ();
+}
+
+static int
+flow_socket_close (flow_socket_t sock)
+{
+  return closesocket (sock);
+}
+
+static int
+flow_should_reconnect (int err)
+{
+  return err == WSAECONNRESET || err == WSAENOTCONN || err == WSAESHUTDOWN;
+}
+#else
+int
+flow_net_init (void)
+{
+  return 0;
+}
+
+void
+flow_net_cleanup (void)
+{
+}
+
+static int
+flow_socket_errno (void)
+{
+  return errno;
+}
+
+static int
+flow_socket_close (flow_socket_t sock)
+{
+  return close (sock);
+}
+
+static int
+flow_should_reconnect (int err)
+{
+  return err == EPIPE || err == ECONNRESET || err == ENOTCONN;
+}
+#endif
+
+void
+flow_close_socket (flow_t *flow)
+{
+  if (flow->sock == FLOW_INVALID_SOCKET)
+    return;
+
+  if (flow_socket_close (flow->sock) < 0)
+    {
+      perror ("Close sock failed");
+    }
+  flow->sock = FLOW_INVALID_SOCKET;
+}
 
 void
 do_sent (flow_t *flow, char *msg, size_t len)
@@ -18,15 +112,16 @@ do_sent (flow_t *flow, char *msg, size_t len)
   while (send (flow->sock, msg, len, MSG_NOSIGNAL) < 0)
     {
       perror ("Send Fail");
-#ifdef _WIN32
-      errno = WSAGetLastError ();
-#endif
-      log_error ("SEND_ERR: [%p][%d]", flow, errno);
-      if (errno == EPIPE || errno == ECONNRESET || errno == ENOTCONN)
+      int err = flow_socket_errno ();
+      errno = err;
+      log_error ("SEND_ERR: [%p][%d]", flow, err);
+      if (flow_should_reconnect (err))
         {
-          while ((flow->sock = do_connect (flow->ip_dst, flow->port_dst)) == 0)
+          flow_close_socket (flow);
+          while ((flow->sock = do_connect (flow->ip_dst, flow->port_dst)) == FLOW_INVALID_SOCKET)
             {
-              log_warn ("FAILED_RECONNECTING: [%p][%d]", flow, flow->sock);
+              log_warn ("FAILED_RECONNECTING: [%p][%llu]", flow,
+                        (unsigned long long) flow->sock);
               break;
               // sleep (1);
             }
@@ -35,12 +130,19 @@ do_sent (flow_t *flow, char *msg, size_t len)
     }
 }
 
-int
+flow_socket_t
 do_connect (struct in_addr ip, u_short port)
 {
   struct sockaddr_in serv_addr;
-  int sock = 0;
-  if ((sock = socket (AF_INET, SOCK_STREAM, 0)) < 0)
+  flow_socket_t sock = FLOW_INVALID_SOCKET;
+
+  if (flow_net_init () != 0)
+    {
+      perror ("Winsock initialization failed");
+      return FLOW_INVALID_SOCKET;
+    }
+
+  if ((sock = socket (AF_INET, SOCK_STREAM, 0)) == FLOW_INVALID_SOCKET)
     {
       perror ("Socket creation failed");
       return sock;
@@ -59,11 +161,11 @@ do_connect (struct in_addr ip, u_short port)
 
   if (connect (sock, (struct sockaddr *) &serv_addr, sizeof (serv_addr)) < 0)
     {
-      if (close (sock) < 0)
+      if (flow_socket_close (sock) < 0)
         {
           perror ("Close sock failed");
         }
-      sock = -1; // 防止后续误用/重复 close
+      sock = FLOW_INVALID_SOCKET; // 防止后续误用/重复 close
       perror ("Connection failed");
       return sock;
     }

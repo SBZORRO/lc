@@ -69,7 +69,7 @@ th_send_flow (void *f)
       flow->fp = NULL;
       log_trace ("   wrote: [%p][%p][%u][%u]", flow, state, state->seq, sw);
 
-      if (flow->sock <= 0)
+      if (flow->sock == FLOW_INVALID_SOCKET)
         {
           int res = detect (state);
           if (res == 0)
@@ -79,13 +79,15 @@ th_send_flow (void *f)
             }
           log_info ("DETECTED: [%p][%p][%u][%d]", flow, state, state->seq, res);
           SET_IP (flow, tar, server[res]);
-          while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) <= 0)
+          while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) == FLOW_INVALID_SOCKET)
             {
-              log_warn ("FAILED_CONNECTING: [%p][%d]", flow, flow->sock);
+              log_warn ("FAILED_CONNECTING: [%p][%llu]", flow,
+                        (unsigned long long) flow->sock);
               break;
               // sleep (1);
             }
-          log_info ("CONECTED: [%p][%p][%u][%d]", flow, state, state->seq, flow->sock);
+          log_info ("CONECTED: [%p][%p][%u][%llu]", flow, state, state->seq,
+                    (unsigned long long) flow->sock);
         }
       log_trace (" sending: [%p][%p][%u]", flow, state, state->seq);
       do_sent (flow, (char *) state->pkt + state->offset_payload, (size_t) state->size_payload);

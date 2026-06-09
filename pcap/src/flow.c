@@ -91,7 +91,7 @@ flow_init (flow_t *flow,
   flow->next = NULL;
   flow->ts = (struct timespec) { 0 };
   flow->flags = 0;
-  flow->sock = -1;
+  flow->sock = FLOW_INVALID_SOCKET;
   flow->fp = NULL;
   flow->size = 0;
   flow->seg_nxt = 0;
@@ -129,7 +129,7 @@ flow_reset (flow_t *flow)
   flow->next = NULL;
   flow->ts = (struct timespec) { 0 };
   flow->flags = 0;
-  flow->sock = -1;
+  flow_close_socket (flow);
   if (flow->fp)
     {
       fclose (flow->fp);
@@ -358,7 +358,7 @@ flow_print (flow_t *f)
   printf ("  name: %s\n", f->filename);
   printf ("  time: %lu\n", f->ts.tv_nsec);
   printf ("  thrd: %lu\n", f->thread);
-  printf ("  sock: %d\n", f->sock);
+  printf ("  sock: %llu\n", (unsigned long long) f->sock);
   printf ("  file: %p\n", f->fp);
 }
 

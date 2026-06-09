@@ -49,8 +49,11 @@
   while (0)
 
 /* client.c */
+int flow_net_init (void);
+void flow_net_cleanup (void);
+void flow_close_socket (flow_t *flow);
 void do_sent (flow_t *flow, char *msg, size_t len);
-int do_connect (struct in_addr sin_addr, uint16_t sin_port);
+flow_socket_t do_connect (struct in_addr sin_addr, uint16_t sin_port);
 
 /* cptr.c */
 int loop (char *filter_exp);

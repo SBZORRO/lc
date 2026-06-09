@@ -1,7 +1,10 @@
 #pragma once
 #ifdef _WIN32
-# include <windows.h>
+# ifndef WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN
+# endif
 # include <winsock2.h>
+# include <windows.h>
 # include <ws2tcpip.h>
 #else
 # include <arpa/inet.h>
@@ -15,6 +18,14 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <time.h>
+
+#ifdef _WIN32
+typedef SOCKET flow_socket_t;
+# define FLOW_INVALID_SOCKET INVALID_SOCKET
+#else
+typedef int flow_socket_t;
+# define FLOW_INVALID_SOCKET (-1)
+#endif
 
 /* ethernet headers are always exactly 14 bytes */
 #define SIZE_ETHERNET 14
@@ -106,7 +117,7 @@ struct flow_struct
   // _Atomic int rst_flg;   //
   uint32_t flags; // tcp flags/thread state
 #define SENDING 0x8000
-  int sock;         // fd/socket to send
+  flow_socket_t sock; // fd/socket to send
   FILE *fp;         // Pointer to file storing this flow's data
   uint32_t size;    // total flow_state
   uint32_t seg_nxt; // expect byt

@@ -26,6 +26,11 @@ main (int argc, char *argv[])
     {
       return -1;
     }
+  if (flow_net_init () != 0)
+    {
+      fclose (fp);
+      return -1;
+    }
   init_logger (fp, LOG_DEBUG);
   log_info ("Hello World!");
 
@@ -55,5 +60,6 @@ main (int argc, char *argv[])
 
   pthread_mutex_destroy (&air_mutex);
 
+  flow_net_cleanup ();
   fclose (fp);
 }
