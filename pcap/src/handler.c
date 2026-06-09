@@ -66,6 +66,7 @@ th_send_flow (void *f)
         }
       fflush (flow->fp);
       fclose (flow->fp);
+      flow->fp = NULL;
       log_trace ("   wrote: [%p][%p][%u][%u]", flow, state, state->seq, sw);
 
       if (flow->sock <= 0)
