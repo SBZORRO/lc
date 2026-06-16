@@ -1,72 +1,194 @@
 [
   {
+    "file": "src/main.c",
     "arguments": [
       "/usr/bin/gcc",
-      "-c",
+      "-Wall",
+      "-Wextra",
+      "-Wformat=2",
+      "-Wshadow",
+      "-Werror=return-type",
+      "-Wconversion",
+      "-Wsign-conversion",
+      "-fanalyzer",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer",
+      "-I../src",
       "-g",
-      "-I.",
       "-o",
       "build/hello",
-      "src/main.c"
+      "src/main.c",
+      "-I."
     ],
     "directory": "/home/sbzorro/git-repo/lc/pcap",
-    "file": "/home/sbzorro/git-repo/lc/pcap/src/main.c",
-    "output": "/home/sbzorro/git-repo/lc/pcap/build/hello"
+    "output": "build/hello"
   },
   {
+    "file": "src/cptr.c",
     "arguments": [
       "/usr/bin/gcc",
-      "-c",
+      "-Wall",
+      "-Wextra",
+      "-Wformat=2",
+      "-Wshadow",
+      "-Werror=return-type",
+      "-Wconversion",
+      "-Wsign-conversion",
+      "-fanalyzer",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer",
+      "-I../src",
       "-g",
-      "-I.",
       "-o",
       "build/hello",
-      "src/pcapimpl.c"
+      "src/cptr.c",
+      "-I."
     ],
     "directory": "/home/sbzorro/git-repo/lc/pcap",
-    "file": "/home/sbzorro/git-repo/lc/pcap/src/pcapimpl.c",
-    "output": "/home/sbzorro/git-repo/lc/pcap/build/hello"
+    "output": "build/hello"
   },
   {
+    "file": "src/client.c",
     "arguments": [
       "/usr/bin/gcc",
-      "-c",
+      "-Wall",
+      "-Wextra",
+      "-Wformat=2",
+      "-Wshadow",
+      "-Werror=return-type",
+      "-Wconversion",
+      "-Wsign-conversion",
+      "-fanalyzer",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer",
+      "-I../src",
       "-g",
-      "-I.",
       "-o",
       "build/hello",
-      "src/client.c"
+      "src/client.c",
+      "-I."
     ],
     "directory": "/home/sbzorro/git-repo/lc/pcap",
-    "file": "/home/sbzorro/git-repo/lc/pcap/src/client.c",
-    "output": "/home/sbzorro/git-repo/lc/pcap/build/hello"
+    "output": "build/hello"
   },
   {
+    "file": "src/flow.c",
     "arguments": [
       "/usr/bin/gcc",
-      "-c",
+      "-Wall",
+      "-Wextra",
+      "-Wformat=2",
+      "-Wshadow",
+      "-Werror=return-type",
+      "-Wconversion",
+      "-Wsign-conversion",
+      "-fanalyzer",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer",
+      "-I../src",
       "-g",
-      "-I.",
       "-o",
       "build/hello",
-      "src/flow.c"
+      "src/flow.c",
+      "-I."
     ],
     "directory": "/home/sbzorro/git-repo/lc/pcap",
-    "file": "/home/sbzorro/git-repo/lc/pcap/src/flow.c",
-    "output": "/home/sbzorro/git-repo/lc/pcap/build/hello"
+    "output": "build/hello"
   },
   {
+    "file": "src/log.c/log.c",
     "arguments": [
       "/usr/bin/gcc",
-      "-c",
+      "-Wall",
+      "-Wextra",
+      "-Wformat=2",
+      "-Wshadow",
+      "-Werror=return-type",
+      "-Wconversion",
+      "-Wsign-conversion",
+      "-fanalyzer",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer",
+      "-I../src",
       "-g",
-      "-I.",
       "-o",
       "build/hello",
-      "log.c/log.c"
+      "src/log.c/log.c",
+      "-I."
     ],
     "directory": "/home/sbzorro/git-repo/lc/pcap",
-    "file": "/home/sbzorro/git-repo/lc/pcap/log.c/log.c",
-    "output": "/home/sbzorro/git-repo/lc/pcap/build/hello"
+    "output": "build/hello"
+  },
+  {
+    "file": "src/logger.c",
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-Wformat=2",
+      "-Wshadow",
+      "-Werror=return-type",
+      "-Wconversion",
+      "-Wsign-conversion",
+      "-fanalyzer",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer",
+      "-I../src",
+      "-g",
+      "-o",
+      "build/hello",
+      "src/logger.c",
+      "-I."
+    ],
+    "directory": "/home/sbzorro/git-repo/lc/pcap",
+    "output": "build/hello"
+  },
+  {
+    "file": "src/util.c",
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-Wformat=2",
+      "-Wshadow",
+      "-Werror=return-type",
+      "-Wconversion",
+      "-Wsign-conversion",
+      "-fanalyzer",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer",
+      "-I../src",
+      "-g",
+      "-o",
+      "build/hello",
+      "src/util.c",
+      "-I."
+    ],
+    "directory": "/home/sbzorro/git-repo/lc/pcap",
+    "output": "build/hello"
+  },
+  {
+    "file": "src/handler.c",
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-Wformat=2",
+      "-Wshadow",
+      "-Werror=return-type",
+      "-Wconversion",
+      "-Wsign-conversion",
+      "-fanalyzer",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer",
+      "-I../src",
+      "-g",
+      "-o",
+      "build/hello",
+      "src/handler.c",
+      "-I."
+    ],
+    "directory": "/home/sbzorro/git-repo/lc/pcap",
+    "output": "build/hello"
   }
 ]
