@@ -106,8 +106,8 @@ flow_init (flow_t *flow,
   return flow;
 }
 
-void
-flow_reset (flow_t *flow)
+static void
+flow_reset_state (flow_t *flow, bool clear_tuple)
 {
   flow_state_t *ptr = flow->next;
   flow->next = NULL; // detach first
@@ -118,17 +118,24 @@ flow_reset (flow_t *flow)
       ptr = next;
     }
 
-  flow->ip_src.s_addr = 0;
-  flow->port_src = 0;
-  flow->ip_dst.s_addr = 0;
-  flow->port_dst = 0;
+  if (clear_tuple)
+    {
+      flow->ip_src.s_addr = 0;
+      flow->port_src = 0;
+      flow->ip_dst.s_addr = 0;
+      flow->port_dst = 0;
+      flow->filename[0] = '\0'; // make it an empty string
+    }
+  else
+    {
+      flow_filename (flow);
+    }
   flow->ip_tar.s_addr = 0;
   flow->port_tar = 0;
-  flow->filename[0] = '\0'; // make it an empty string
 
   flow->next = NULL;
   flow->ts = (struct timespec) { 0 };
-  flow->flags = 0;
+  flow->flags = clear_tuple ? 0 : (flow->flags & SENDING);
   flow_close_socket (flow);
   if (flow->fp)
     {
@@ -137,7 +144,12 @@ flow_reset (flow_t *flow)
     }
   flow->size = 0;
   flow->seg_nxt = 0;
+}
 
+void
+flow_reset (flow_t *flow)
+{
+  flow_reset_state (flow, true);
   pthread_mutex_destroy (&flow->mutex);
 }
 
@@ -154,6 +166,12 @@ flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp)
   // receieve SYN
   if (th_flags & TH_SYN)
     {
+      if (flow->next != NULL || flow->seg_nxt != 0 || flow->sock != FLOW_INVALID_SOCKET)
+        {
+          flow_reset_state (flow, false);
+          thread_bits = flow->flags & THREAD_MASK;
+          tcp_bits = 0;
+        }
       tcp_bits &= ~TH_RST; // unset rst flag
       tcp_bits |= th_flags;
       flow->flags = thread_bits | tcp_bits;
@@ -164,7 +182,7 @@ flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp)
     }
   else if (th_flags & TH_RST) // receive RST
     {
-      flow_reset (flow);
+      flow_reset_state (flow, false);
       tcp_bits = TH_RST; // reset tcp bits
       flow->flags = thread_bits | tcp_bits;
       log_trace ("RST");

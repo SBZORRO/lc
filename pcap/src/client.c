@@ -118,7 +118,7 @@ do_sent (flow_t *flow, char *msg, size_t len)
       if (flow_should_reconnect (err))
         {
           flow_close_socket (flow);
-          while ((flow->sock = do_connect (flow->ip_dst, flow->port_dst)) == FLOW_INVALID_SOCKET)
+          while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) == FLOW_INVALID_SOCKET)
             {
               log_warn ("FAILED_RECONNECTING: [%p][%llu]", flow,
                         (unsigned long long) flow->sock);

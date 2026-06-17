@@ -88,6 +88,11 @@ th_send_flow (void *f)
             }
           log_info ("CONECTED: [%p][%p][%u][%llu]", flow, state, state->seq,
                     (unsigned long long) flow->sock);
+          if (flow->sock == FLOW_INVALID_SOCKET)
+            {
+              flow_state_free (state);
+              continue;
+            }
         }
       log_trace (" sending: [%p][%p][%u]", flow, state, state->seq);
       do_sent (flow, (char *) state->pkt + state->offset_payload, (size_t) state->size_payload);
@@ -173,6 +178,7 @@ th_dispatch_flow (void *arg)
           if (flow == NULL)
             {
               log_error ("TOO_MUCH_FLOW!");
+              free (p);
               pthread_mutex_unlock (&air_mutex);
               continue;
             }
@@ -184,7 +190,10 @@ th_dispatch_flow (void *arg)
         }
 
       // handle RST/SYN flags
-      if (flow_handshake (flow, flags, seq, size_payload) == 0)
+      pthread_mutex_lock (&flow->mutex);
+      uint32_t flow_flags = flow_handshake (flow, flags, seq, size_payload);
+      pthread_mutex_unlock (&flow->mutex);
+      if (flow_flags == 0)
         {
           free (p);
           pthread_mutex_unlock (&air_mutex);
