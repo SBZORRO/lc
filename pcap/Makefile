@@ -38,7 +38,10 @@ $(BLD)/wintest: $(TST)/test.c $(DEPS)
 	$(CC) $(CFLAGS) -g -o $@ $^ -I../../WpdPack_4_1_2/WpdPack/Include -I../../w64devkit/include -L../../WpdPack_4_1_2/WpdPack/Lib -L../../w64devkit/lib -L. -lwpcap -lws2_32 -lwinpthread
 
 $(BLD)/test: $(TST)/test.c $(DEPS)
-	$(CC) -g -o $@ $^ -I. -lpcap
+	$(CC) $(CFLAGS) -g -o $@ $^ -I. -lpcap
+
+$(BLD)/spsc_test: $(TST)/spsc_test.c $(SRC)/spsc_queue.h
+	$(CC) $(CFLAGS) -g -o $@ $(TST)/spsc_test.c -I.
 
 $(BLD)/pool_test: $(TST)/pool_test.c $(SRC)/pool.c $(SRC)/pool.h
 	$(CC) $(CFLAGS) -g -o $@ $(TST)/pool_test.c $(SRC)/pool.c -I. -pthread

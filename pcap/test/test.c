@@ -19,6 +19,8 @@ static int main_ret = 0;
 static int test_count = 0;
 static int test_pass = 0;
 
+#define U8(s) ((uint8_t *) (s))
+
 // C99+
 #define STR_ARR(...) ((const char *[]) { __VA_ARGS__ })
 #define STR_ARR_LEN(...) (sizeof ((const char *[]) { __VA_ARGS__ }) / sizeof (const char *))
@@ -68,7 +70,7 @@ static int test_pass = 0;
 #define TEST_FLOW_STATE_PKT_SLICE(ptr, sn, sp, op, p, len, tar)              \
   do                                                                         \
     {                                                                        \
-      flow_state_t *state = flow_state_create (ptr, sn, 0, 0, sp, op, p);    \
+      flow_state_t *state = flow_state_create (ptr, sn, 0, 0, sp, op, U8 (p)); \
       state->pkt = malloc (len);                                             \
       memcpy (state->pkt, p, len);                                           \
       EXPECT_EQ_INT (sn, state->seq);                                        \
@@ -124,7 +126,7 @@ test_flow_state_pkt_slice ()
 #define CREATE_AND_ATTACH_PARTIALLY(ptr, sn, sp, op, p, len, tar)      \
   do                                                                   \
     {                                                                  \
-      flow_state_t *st = flow_state_create (ptr, sn, 0, 0, sp, op, p); \
+      flow_state_t *st = flow_state_create (ptr, sn, 0, 0, sp, op, U8 (p)); \
       st->pkt = malloc (len);                                          \
       memcpy (st->pkt, p, len);                                        \
       flow_state_attach (ptr, st);                                     \
@@ -171,7 +173,7 @@ test_flow_state_attach_partially ()
   print_hex (buffer, i);
   printf ("PAYLOAD: ");
   // clang-format off
-  print_hex ("123""5678""5678""\x0" "\x0" "34""\x0" "\x0" "3""\x0" "\x0""\x0""""5678""5678""\x0" "678""\x0" "\x0" "78""5" "\x0" "\x0" "8""56" "\x0" "\x0""567" "\x0""5678""78" "\x0" "\x0""8" "\x0" "\x0""\x0" "\x0""\x0""", i);
+  print_hex ((const uint8_t *) "123""5678""5678""\x0" "\x0" "34""\x0" "\x0" "3""\x0" "\x0""\x0""""5678""5678""\x0" "678""\x0" "\x0" "78""5" "\x0" "\x0" "8""56" "\x0" "\x0""567" "\x0""5678""78" "\x0" "\x0""8" "\x0" "\x0""\x0" "\x0""\x0""", i);
   // clang-format on
   flow_reset (ptr);
 }
@@ -216,7 +218,7 @@ test_flow_state_attach_retrans ()
   print_hex (buffer, i);
   printf ("PAYLOAD: ");
   // clang-format off
-  print_hex ("123""5678""5678""\x0" "\x0" "34""\x0" "\x0" "3""\x0" "\x0""\x0""""5678""5678""\x0" "678""\x0" "\x0" "78""5" "\x0" "\x0" "8""56" "\x0" "\x0""567" "\x0""5678""78" "\x0" "\x0""8" "\x0" "\x0""\x0" "\x0""\x0""", i);
+  print_hex ((const uint8_t *) "123""5678""5678""\x0" "\x0" "34""\x0" "\x0" "3""\x0" "\x0""\x0""""5678""5678""\x0" "678""\x0" "\x0" "78""5" "\x0" "\x0" "8""56" "\x0" "\x0""567" "\x0""5678""78" "\x0" "\x0""8" "\x0" "\x0""\x0" "\x0""\x0""", i);
   // clang-format on
   flow_reset (ptr);
 }
@@ -224,7 +226,7 @@ test_flow_state_attach_retrans ()
 #define CREATE_AND_ATTACH(ptr, seq, len, p)                             \
   do                                                                    \
     {                                                                   \
-      flow_state_t *st = flow_state_create (ptr, seq, 0, 0, len, 0, p); \
+      flow_state_t *st = flow_state_create (ptr, seq, 0, 0, len, 0, U8 (p)); \
       st->pkt = malloc (len);                                           \
       memcpy (st->pkt, p, len);                                         \
       flow_state_attach (ptr, st);                                      \
@@ -234,17 +236,17 @@ test_flow_state_attach_retrans ()
 #define TEST_DETACH_FLOW_STATE(ptr, sq, sp, pl)          \
   do                                                     \
     {                                                    \
-      flow_state_t *state = ptr->next;                   \
-      flow_state_t *st = flow_state_detach (ptr, state); \
-      EXPECT_EQ_PTR (ptr, state->flow);                  \
-      EXPECT_EQ_INT (sq, state->seq);                    \
-      EXPECT_EQ_INT (sp, state->size_payload);           \
+      flow_state_t *detached_state = ptr->next;          \
+      flow_state_t *st = flow_state_detach (ptr, detached_state); \
+      EXPECT_EQ_PTR (ptr, detached_state->flow);         \
+      EXPECT_EQ_INT (sq, detached_state->seq);           \
+      EXPECT_EQ_INT (sp, detached_state->size_payload);  \
       if (st != NULL)                                    \
         {                                                \
-          EXPECT_EQ_STRING (pl, state->pkt, sp);         \
-          flow_state_free (state);                       \
+          EXPECT_EQ_STRING (pl, detached_state->pkt, sp); \
+          flow_state_free (detached_state);              \
         }                                                \
-      state = NULL;                                      \
+      detached_state = NULL;                             \
     }                                                    \
   while (0)
 
@@ -258,6 +260,7 @@ test_flow_state_attach ()
 
   MAKE_STR_ARRAY (str, "123", " ", "abger0[g]", "123", "       ", "1234567");
   MAKE_INT_ARRAY (len, sizeof ("123"), sizeof (" "), sizeof ("abger0[g]"), sizeof ("123"), sizeof ("       "), sizeof ("1234567"));
+  (void) len_len;
 
   CREATE_AND_ATTACH (ptr, 123, 3, "123");
   CREATE_AND_ATTACH (ptr, 921034, 7, "1234567");
@@ -268,7 +271,7 @@ test_flow_state_attach ()
   EXPECT_EQ_INT ((uint32_t) str_len, ptr->size);
 
   flow_state_t *state = ptr->next;
-  for (int i = 0; i < str_len; i++)
+  for (size_t i = 0; i < str_len; i++)
     {
       int r = memcmp (str[i], state->pkt, len[i] - 1);
       EXPECT_EQ_INT (0, r);
@@ -287,7 +290,7 @@ test_flow_state_attach ()
   TEST_DETACH_FLOW_STATE (ptr, 154, 1, "       ");
   TEST_DETACH_FLOW_STATE (ptr, 154, 1, "1234567");
   EXPECT_EQ_INT (ptr->seg_nxt, 123 + 3);
-  EXPECT_EQ_INT (str_len - 1, ptr->size);
+  EXPECT_EQ_INT ((uint32_t) (str_len - 1), ptr->size);
 
   // printf ("  payload: ");
   // flow_state_print (ptr);
@@ -315,6 +318,7 @@ test_flow_state_attach2 ()
 
   MAKE_STR_ARRAY (str, "123", "456", "7", "89", "0", "11");
   MAKE_INT_ARRAY (len, sizeof ("123"), sizeof ("456"), sizeof ("7"), sizeof ("89"), sizeof ("0"), sizeof ("11"));
+  (void) len_len;
 
   CREATE_AND_ATTACH (ptr, 3, 1, "7");
   CREATE_AND_ATTACH (ptr, 0, 3, "456");
@@ -325,7 +329,7 @@ test_flow_state_attach2 ()
   EXPECT_EQ_INT ((uint32_t) str_len, ptr->size);
 
   flow_state_t *state = ptr->next;
-  for (int i = 0; i < str_len; i++)
+  for (size_t i = 0; i < str_len; i++)
     {
       int r = memcmp (str[i], state->pkt, len[i] - 1);
       EXPECT_EQ_INT (0, r);
@@ -380,14 +384,14 @@ void
 test_contain ()
 {
   printf ("test_contain\n");
-  EXPECT_EQ_INT (contain ("test", 4, test), 1);
-  EXPECT_EQ_INT (contain ("test1", 5, test), 1);
-  EXPECT_EQ_INT (contain ("\x1b", 1, test), 1);
+  EXPECT_EQ_INT (contain (U8 ("test"), 4, test), 1);
+  EXPECT_EQ_INT (contain (U8 ("test1"), 5, test), 1);
+  EXPECT_EQ_INT (contain (U8 ("\x1b"), 1, test), 1);
   EXPECT_EQ_INT (contain (NULL, 0, test), 0);
-  EXPECT_EQ_INT (contain ("W", 1, test), 1);
-  EXPECT_EQ_INT (contain ("Hello World!", 12, test), 1);
-  EXPECT_EQ_INT (contain ("asdf\x04lasWORLD!adfasd\x04", 21, test), 1);
-  EXPECT_EQ_INT (contain ("*2A\x04", 4, test), 1);
+  EXPECT_EQ_INT (contain (U8 ("W"), 1, test), 1);
+  EXPECT_EQ_INT (contain (U8 ("Hello World!"), 12, test), 1);
+  EXPECT_EQ_INT (contain (U8 ("asdf\x04lasWORLD!adfasd\x04"), 21, test), 1);
+  EXPECT_EQ_INT (contain (U8 ("*2A\x04"), 4, test), 1);
 }
 
 void
@@ -525,6 +529,70 @@ test_flow_handshake ()
   EXPECT_EQ_INT (TH_SYN | TH_ACK | TH_CWR | TH_URG, flow_handshake (ptr, TH_ACK | TH_URG, 1, 1));
 }
 
+void
+test_flow_syn_resets_existing_tuple ()
+{
+  printf ("test_flow_syn_resets_existing_tuple\n");
+
+  struct in_addr src = { .s_addr = 0x01020304 };
+  struct in_addr dst = { .s_addr = 0x05060708 };
+  uint16_t sport = htons (1234);
+  uint16_t dport = htons (5678);
+  flow_t flow;
+  flow_t *ptr = &flow;
+  flow_init (ptr, src, dst, sport, dport);
+
+  ptr->flags = SENDING | TH_ACK;
+  ptr->seg_nxt = 9000;
+  SET_IP (ptr, tar, "127.0.0.1:9999");
+  CREATE_AND_ATTACH (ptr, 9000, 3, "abc");
+
+  EXPECT_EQ_INT (SENDING | TH_SYN, flow_handshake (ptr, TH_SYN, 100, 1));
+  EXPECT_EQ_INT (src.s_addr, ptr->ip_src.s_addr);
+  EXPECT_EQ_INT (dst.s_addr, ptr->ip_dst.s_addr);
+  EXPECT_EQ_INT (sport, ptr->port_src);
+  EXPECT_EQ_INT (dport, ptr->port_dst);
+  EXPECT_EQ_INT (0, ptr->ip_tar.s_addr);
+  EXPECT_EQ_INT (0, ptr->port_tar);
+  EXPECT_EQ_PTR (NULL, ptr->next);
+  EXPECT_EQ_INT (0, ptr->size);
+  EXPECT_EQ_INT (101, ptr->seg_nxt);
+
+  flow_reset (ptr);
+}
+
+void
+test_flow_rst_keeps_mutex_usable ()
+{
+  printf ("test_flow_rst_keeps_mutex_usable\n");
+
+  struct in_addr src = { .s_addr = 0x01020304 };
+  struct in_addr dst = { .s_addr = 0x05060708 };
+  uint16_t sport = htons (1234);
+  uint16_t dport = htons (5678);
+  flow_t flow;
+  flow_t *ptr = &flow;
+  flow_init (ptr, src, dst, sport, dport);
+
+  ptr->seg_nxt = 100;
+  CREATE_AND_ATTACH (ptr, 100, 3, "abc");
+
+  EXPECT_EQ_INT (0, flow_handshake (ptr, TH_RST, 103, 1));
+  EXPECT_EQ_INT (src.s_addr, ptr->ip_src.s_addr);
+  EXPECT_EQ_INT (dst.s_addr, ptr->ip_dst.s_addr);
+  EXPECT_EQ_INT (sport, ptr->port_src);
+  EXPECT_EQ_INT (dport, ptr->port_dst);
+  EXPECT_EQ_PTR (NULL, ptr->next);
+  EXPECT_EQ_INT (0, ptr->size);
+  EXPECT_EQ_INT (TH_RST, ptr->flags);
+
+  EXPECT_EQ_INT (0, pthread_mutex_lock (&ptr->mutex));
+  EXPECT_EQ_INT (0, pthread_mutex_unlock (&ptr->mutex));
+  EXPECT_EQ_INT (TH_SYN, flow_handshake (ptr, TH_SYN, 200, 1));
+
+  flow_reset (ptr);
+}
+
 #define TEST_SET_IP(t, host, ei, ep)                                         \
   do                                                                         \
     {                                                                        \
@@ -533,7 +601,8 @@ test_flow_handshake ()
       flow_init (ptr, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0); \
       SET_IP (ptr, t, host);                                                 \
       EXPECT_EQ_INT (ep, ntohs (ptr->port_##t));                             \
-      EXPECT_EQ_INT (ei, ptr->ip_##t.s_addr);                                \
+      EXPECT_EQ_BASE ((uint32_t) (ei) == ptr->ip_##t.s_addr,                 \
+                      (uint32_t) (ei), ptr->ip_##t.s_addr, "%u");            \
       flow_reset (ptr);                                                      \
     }                                                                        \
   while (0)
@@ -541,18 +610,18 @@ test_flow_handshake ()
 void
 test_set_ip ()
 {
-  TEST_SET_IP (tar, "127.0.0.1:1234", 1 << 24 | 127, 1234);
-  TEST_SET_IP (tar, "192.168.0.1:9999", 1 << 24 | 168 << 8 | 192, 9999);
-  TEST_SET_IP (tar, "1.1.1.1:1", 1 << 24 | 1 << 16 | 1 << 8 | 1, 1);
-  TEST_SET_IP (tar, "255.255.255.255:255", 255 << 24 | 255 << 16 | 255 << 8 | 255, 255);
-  TEST_SET_IP (src, "10.10.10.10:10", 10 << 24 | 10 << 16 | 10 << 8 | 10, 10);
+  TEST_SET_IP (tar, "127.0.0.1:1234", UINT32_C (1) << 24 | 127, 1234);
+  TEST_SET_IP (tar, "192.168.0.1:9999", UINT32_C (1) << 24 | UINT32_C (168) << 8 | 192, 9999);
+  TEST_SET_IP (tar, "1.1.1.1:1", UINT32_C (1) << 24 | UINT32_C (1) << 16 | UINT32_C (1) << 8 | 1, 1);
+  TEST_SET_IP (tar, "255.255.255.255:255", UINT32_C (255) << 24 | UINT32_C (255) << 16 | UINT32_C (255) << 8 | 255, 255);
+  TEST_SET_IP (src, "10.10.10.10:10", UINT32_C (10) << 24 | UINT32_C (10) << 16 | UINT32_C (10) << 8 | 10, 10);
   TEST_SET_IP (src, "0.0.0.0:0", 0, 0);
-  TEST_SET_IP (dst, "127.0.1.1:65535", 1 << 24 | 1 << 16 | 127, 65535);
-  TEST_SET_IP (dst, "0.127.127.1:123", 1 << 24 | 127 << 16 | 127 << 8, 123);
+  TEST_SET_IP (dst, "127.0.1.1:65535", UINT32_C (1) << 24 | UINT32_C (1) << 16 | 127, 65535);
+  TEST_SET_IP (dst, "0.127.127.1:123", UINT32_C (1) << 24 | UINT32_C (127) << 16 | UINT32_C (127) << 8, 123);
 }
 
 int
-main (int argc, char *argv[])
+main (void)
 {
   test_flow_state_attach ();
   test_flow_state_attach2 ();
@@ -564,6 +633,8 @@ main (int argc, char *argv[])
   test_detect ();
   test_cal ();
   test_flow_handshake ();
+  test_flow_syn_resets_existing_tuple ();
+  test_flow_rst_keeps_mutex_usable ();
   test_set_ip ();
 
   printf ("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
