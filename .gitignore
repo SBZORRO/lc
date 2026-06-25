@@ -2,3 +2,9 @@
 /pcap/build/*
 /pcap/build/
 /.cache/
+/.agent-shell/
+*.o
+*.a
+*.s
+*.i
+*.so
