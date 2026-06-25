@@ -16,6 +16,10 @@
 
 #define CPTR_BUF_SIZE 256 * 1024 * 1024
 
+#define FLOW_DIR_UNKNOWN 0
+#define FLOW_DIR_REQUEST 1
+#define FLOW_DIR_RESPONSE 2
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -76,6 +80,8 @@ flow_t *flow_set_src (flow_t *flow, char *src_addr);
 void flow_reset (flow_t *flow);
 flow_t *flow_init (flow_t *flow, const struct in_addr src, const struct in_addr dst, const uint16_t sport, const uint16_t dport);
 flow_t *flow_find (flow_arr_t *fa, struct in_addr src, struct in_addr dst, uint16_t sport, uint16_t dport);
+flow_t *flow_find_peer (flow_arr_t *fa, flow_t *flow);
+void flow_link_peer (flow_t *flow, flow_t *peer);
 uint32_t flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp);
 flow_t *flow_add (flow_arr_t *fa);
 

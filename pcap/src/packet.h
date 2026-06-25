@@ -111,6 +111,8 @@ struct flow_state_struct
 struct flow_struct
 {
   flow_state_t *next;    /* Link to next one */
+  flow_t *peer;          // the other direction
+  uint8_t dir_role;      // unknown/request/response
   struct timespec ts;    // last segment ts
   pthread_t thread;      // thread to process flow
   pthread_mutex_t mutex; // attach/detach mutex
@@ -118,9 +120,9 @@ struct flow_struct
   uint32_t flags; // tcp flags/thread state
 #define SENDING 0x8000
   flow_socket_t sock; // fd/socket to send
-  FILE *fp;         // Pointer to file storing this flow's data
-  uint32_t size;    // total flow_state
-  uint32_t seg_nxt; // expect byt
+  FILE *fp;           // Pointer to file storing this flow's data
+  uint32_t size;      // total flow_state
+  uint32_t seg_nxt;   // expect byt
   struct in_addr
     ip_src,
     ip_dst,

@@ -593,6 +593,39 @@ test_flow_rst_keeps_mutex_usable ()
   flow_reset (ptr);
 }
 
+void
+test_flow_peer_link_and_reset ()
+{
+  printf ("test_flow_peer_link_and_reset\n");
+
+  struct in_addr client = { .s_addr = 0x01020304 };
+  struct in_addr server = { .s_addr = 0x05060708 };
+  uint16_t client_port = htons (1234);
+  uint16_t server_port = htons (5678);
+
+  flow_arr_t *arr = flow_arr_init (2);
+  flow_t *req = flow_add (arr);
+  flow_init (req, client, server, client_port, server_port);
+  flow_t *resp = flow_add (arr);
+  flow_init (resp, server, client, server_port, client_port);
+
+  EXPECT_EQ_PTR (resp, flow_find_peer (arr, req));
+  EXPECT_EQ_PTR (req, flow_find_peer (arr, resp));
+
+  req->dir_role = FLOW_DIR_REQUEST;
+  flow_link_peer (req, resp);
+  EXPECT_EQ_PTR (resp, req->peer);
+  EXPECT_EQ_PTR (req, resp->peer);
+  EXPECT_EQ_INT (FLOW_DIR_REQUEST, req->dir_role);
+  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, resp->dir_role);
+
+  flow_reset (req);
+  EXPECT_EQ_PTR (NULL, resp->peer);
+  EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, resp->dir_role);
+  flow_reset (resp);
+  free (arr);
+}
+
 #define TEST_SET_IP(t, host, ei, ep)                                         \
   do                                                                         \
     {                                                                        \
@@ -635,6 +668,7 @@ main (void)
   test_flow_handshake ();
   test_flow_syn_resets_existing_tuple ();
   test_flow_rst_keeps_mutex_usable ();
+  test_flow_peer_link_and_reset ();
   test_set_ip ();
 
   printf ("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);

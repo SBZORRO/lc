@@ -183,6 +183,7 @@ th_dispatch_flow (void *arg)
               continue;
             }
           flow_init (flow, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
+          flow_link_peer (flow, flow_find_peer (fa, flow));
           log_info (
             "NEW_FLOW: [%p][%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d]",
             flow,

@@ -76,6 +76,43 @@ flow_find (flow_arr_t *fa,
 }
 
 flow_t *
+flow_find_peer (flow_arr_t *fa, flow_t *flow)
+{
+  if (fa == NULL || flow == NULL)
+    {
+      return NULL;
+    }
+  return flow_find (fa, flow->ip_dst, flow->ip_src, flow->port_dst, flow->port_src);
+}
+
+void
+flow_link_peer (flow_t *flow, flow_t *peer)
+{
+  if (flow == NULL || peer == NULL || flow == peer)
+    {
+      return;
+    }
+  flow->peer = peer;
+  peer->peer = flow;
+  if (flow->dir_role == FLOW_DIR_REQUEST)
+    {
+      peer->dir_role = FLOW_DIR_RESPONSE;
+    }
+  else if (flow->dir_role == FLOW_DIR_RESPONSE)
+    {
+      peer->dir_role = FLOW_DIR_REQUEST;
+    }
+  else if (peer->dir_role == FLOW_DIR_REQUEST)
+    {
+      flow->dir_role = FLOW_DIR_RESPONSE;
+    }
+  else if (peer->dir_role == FLOW_DIR_RESPONSE)
+    {
+      flow->dir_role = FLOW_DIR_REQUEST;
+    }
+}
+
+flow_t *
 flow_init (flow_t *flow,
            const struct in_addr src, const struct in_addr dst,
            const u_short sport, const u_short dport)
@@ -84,12 +121,14 @@ flow_init (flow_t *flow,
   flow->port_src = sport;
   flow->ip_dst = dst;
   flow->port_dst = dport;
+  flow->peer = NULL;
+  flow->dir_role = FLOW_DIR_UNKNOWN;
   flow->ip_tar.s_addr = 0;
   flow->port_tar = 0;
   flow_filename (flow);
 
   flow->next = NULL;
-  flow->ts = (struct timespec) { 0 };
+  flow->ts = (struct timespec){ 0 };
   flow->flags = 0;
   flow->sock = FLOW_INVALID_SOCKET;
   flow->fp = NULL;
@@ -109,6 +148,16 @@ flow_init (flow_t *flow,
 static void
 flow_reset_state (flow_t *flow, bool clear_tuple)
 {
+  if (clear_tuple && flow->peer != NULL)
+    {
+      flow->peer->peer = NULL;
+      if (flow->peer->dir_role != FLOW_DIR_UNKNOWN)
+        {
+          flow->peer->dir_role = FLOW_DIR_UNKNOWN;
+        }
+      flow->peer = NULL;
+    }
+
   flow_state_t *ptr = flow->next;
   flow->next = NULL; // detach first
   while (ptr)
@@ -134,7 +183,8 @@ flow_reset_state (flow_t *flow, bool clear_tuple)
   flow->port_tar = 0;
 
   flow->next = NULL;
-  flow->ts = (struct timespec) { 0 };
+  flow->dir_role = FLOW_DIR_UNKNOWN;
+  flow->ts = (struct timespec){ 0 };
   flow->flags = clear_tuple ? 0 : (flow->flags & SENDING);
   flow_close_socket (flow);
   if (flow->fp)
