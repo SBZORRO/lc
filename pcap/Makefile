@@ -1,7 +1,8 @@
 CC := gcc
 
+# gcc -fanalyzer; clang --analyzer; clang-low-level -Xanalyzer
 # CFLAGS := -Wall -I../src
-CFLAGS := -Wall -Wextra -Wformat=2 -Wshadow -Werror=return-type -Wconversion -Wsign-conversion -fanalyzer -fsanitize=address,undefined -fno-omit-frame-pointer -I../src
+CFLAGS := -Wall -Wextra -Wformat=2 -Wshadow -Werror=return-type -Wconversion -Wsign-conversion -fsanitize=address,undefined -fno-omit-frame-pointer -I../src
 
 SRC := ./src
 BLD := ./build
