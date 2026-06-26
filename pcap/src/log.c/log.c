@@ -134,7 +134,7 @@ log_add_callback (log_LogFn fn, void *udata, int level)
     {
       if (!L.callbacks[i].fn)
         {
-          L.callbacks[i] = (Callback) { fn, udata, level };
+          L.callbacks[i] = (Callback){ fn, udata, level };
           return i;
         }
     }

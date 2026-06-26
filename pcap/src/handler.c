@@ -1,3 +1,4 @@
+#include <netinet/in.h>
 #include <pcap/pcap.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -24,7 +25,7 @@ void *
 th_send_flow (void *f)
 {
   flow_t *flow = (flow_t *) f;
-  int rst = 0;
+  int retry = 0;
   while (1)
     {
       pthread_mutex_lock (&flow->mutex);
@@ -33,7 +34,7 @@ th_send_flow (void *f)
 
       if (state == NULL)
         {
-          if (++rst <= 60)
+          if (++retry <= 60)
             {
               sleep (1);
               continue;
@@ -51,8 +52,7 @@ th_send_flow (void *f)
             }
           pthread_mutex_unlock (&air_mutex);
         }
-      rst = 0;
-
+      retry = 0;
       log_debug ("POP_STAT: [%p][%p]", flow, state);
 
       /* write the data into the file */
@@ -71,23 +71,22 @@ th_send_flow (void *f)
 
       if (flow->sock == FLOW_INVALID_SOCKET)
         {
-          int res = detect (state);
-          if (res == 0)
+          flow_detect_t res = detect (flow, state);
+          if (res.target == 0)
             {
               flow_state_free (state);
               continue;
             }
-          log_info ("DETECTED: [%p][%p][%u][%d]", flow, state, state->seq, res);
-          SET_IP (flow, tar, server[res]);
+          log_info ("DETECTED: [%p][%p][%u][%u][%u][%u]", flow, state, state->seq, res.dir, res.protocol, res.type);
+
+          SET_IP (flow, tar, server[res.target]);
           while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) == FLOW_INVALID_SOCKET)
             {
-              log_warn ("FAILED_CONNECTING: [%p][%llu]", flow,
-                        (unsigned long long) flow->sock);
+              log_warn ("FAILED_CONNECTING: [%p][%llu]", flow, (unsigned long long) flow->sock);
               break;
               // sleep (1);
             }
-          log_info ("CONECTED: [%p][%p][%u][%llu]", flow, state, state->seq,
-                    (unsigned long long) flow->sock);
+          log_info ("CONECTED: [%p][%p][%u][%llu]", flow, state, state->seq, (unsigned long long) flow->sock);
           if (flow->sock == FLOW_INVALID_SOCKET)
             {
               flow_state_free (state);
@@ -157,11 +156,7 @@ th_dispatch_flow (void *arg)
       offset_payload = SIZE_ETHERNET + size_ip + size_tcp;
       payload = (u_char *) (p + offset_payload);
 
-      log_info ("DEQUEUED: "
-                "[%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d]"
-                "[%u][%u][%u][%u][%u]",
-                filename (ip->ip_src, tcp->th_sport, ip->ip_dst, tcp->th_dport),
-                seq, ack, flags, offset_payload, size_payload);
+      log_info ("DEQUEUED: [%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d][%u][%u][%u][%u][%u]", filename (ip->ip_src, tcp->th_sport, ip->ip_dst, tcp->th_dport), seq, ack, flags, offset_payload, size_payload);
       log_hex (LOG_INFO, "HPAYLOAD: %s", payload, size_payload);
       log_info ("APAYLOAD: %.*s", size_payload, payload);
 
@@ -184,10 +179,7 @@ th_dispatch_flow (void *arg)
             }
           flow_init (flow, ip->ip_src, ip->ip_dst, tcp->th_sport, tcp->th_dport);
           flow_link_peer (flow, flow_find_peer (fa, flow));
-          log_info (
-            "NEW_FLOW: [%p][%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d]",
-            flow,
-            filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
+          log_info ("NEW_FLOW: [%p][%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d]", flow, filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
         }
 
       // handle RST/SYN flags
@@ -215,10 +207,7 @@ th_dispatch_flow (void *arg)
           /*     flow->fp = fopen (name, "ab"); */
           /*   } */
           flow->flags = flow->flags | SENDING;
-          log_info (
-            "NEW_THRD: [%p][%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d]",
-            flow,
-            filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
+          log_info ("NEW_THRD: [%p][%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d]", flow, filename (flow->ip_src, flow->port_src, flow->ip_dst, flow->port_dst));
           pthread_create (&flow->thread, NULL, th_send_flow, (void *) flow);
           // int rc = pthread_setname_np (pthread_self (), name);
         }

@@ -386,12 +386,12 @@ test_contain ()
   printf ("test_contain\n");
   EXPECT_EQ_INT (contain (U8 ("test"), 4, test), 1);
   EXPECT_EQ_INT (contain (U8 ("test1"), 5, test), 1);
-  EXPECT_EQ_INT (contain (U8 ("\x1b"), 1, test), 1);
+  EXPECT_EQ_INT (contain (U8 ("\x1b"), 1, test), 4);
   EXPECT_EQ_INT (contain (NULL, 0, test), 0);
-  EXPECT_EQ_INT (contain (U8 ("W"), 1, test), 1);
-  EXPECT_EQ_INT (contain (U8 ("Hello World!"), 12, test), 1);
-  EXPECT_EQ_INT (contain (U8 ("asdf\x04lasWORLD!adfasd\x04"), 21, test), 1);
-  EXPECT_EQ_INT (contain (U8 ("*2A\x04"), 4, test), 1);
+  EXPECT_EQ_INT (contain (U8 ("W"), 1, test), 3);
+  EXPECT_EQ_INT (contain (U8 ("Hello World!"), 12, test), 2);
+  EXPECT_EQ_INT (contain (U8 ("asdf\x04lasWORLD!adfasd\x04"), 21, test), 3);
+  EXPECT_EQ_INT (contain (U8 ("*2A\x04"), 4, test), 5);
 }
 
 void
@@ -410,13 +410,29 @@ test_detect ()
   CREATE_AND_ATTACH (fp, 6666, 8, "Servo-u0");
   CREATE_AND_ATTACH (fp, 3333, 3, "Servo-u0");
   CREATE_AND_ATTACH (fp, 372, 21, "asdf\x04lasWORLD!900PCI\x04");
-  EXPECT_EQ_INT (detect (fp->next), 0);
-  EXPECT_EQ_INT (detect (fp->next->next), 3);
-  EXPECT_EQ_INT (detect (fp->next->next->next), 3);
-  EXPECT_EQ_INT (detect (fp->next->next->next->next), 1);
-  EXPECT_EQ_INT (detect (fp->next->next->next->next->next), 1);
-  EXPECT_EQ_INT (detect (fp->next->next->next->next->next->next), 2);
-  EXPECT_EQ_INT (detect (fp->next->next->next->next->next->next->next), 0);
+  flow_detect_t detected = detect (fp, fp->next);
+  EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, detected.dir);
+  EXPECT_EQ_INT (0, detected.target);
+  detected = detect (fp, fp->next->next);
+  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
+  EXPECT_EQ_INT (3, detected.protocol);
+  EXPECT_EQ_INT (6, detected.type);
+  EXPECT_EQ_INT (0, detected.target);
+  detected = detect (fp, fp->next->next->next);
+  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
+  EXPECT_EQ_INT (0, detected.target);
+  detected = detect (fp, fp->next->next->next->next);
+  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
+  EXPECT_EQ_INT (0, detected.target);
+  detected = detect (fp, fp->next->next->next->next->next);
+  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
+  EXPECT_EQ_INT (0, detected.target);
+  detected = detect (fp, fp->next->next->next->next->next->next);
+  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
+  EXPECT_EQ_INT (0, detected.target);
+  detected = detect (fp, fp->next->next->next->next->next->next->next);
+  EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, detected.dir);
+  EXPECT_EQ_INT (0, detected.target);
 
   /* CREATE_AND_ATTACH (ptr + 1, 77, 8, "BER2057\x04"); */
   /* EXPECT_EQ_INT (detect (ptr + 1), 2); */
@@ -428,6 +444,88 @@ test_detect ()
   /* EXPECT_EQ_INT (detect (ptr + 3), 2); */
 
   flow_reset (fp);
+}
+
+void
+test_flow_detect_dir ()
+{
+  printf ("test_flow_detect_dir\n");
+
+  flow_t req;
+  flow_t resp;
+  flow_init (&req, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+  flow_init (&resp, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+  flow_link_peer (&req, &resp);
+
+  CREATE_AND_ATTACH (&req, 1, 7, "RCTY1C\x04");
+  flow_detect_t detected = detect (&req, req.next);
+  EXPECT_EQ_INT (FLOW_DIR_REQUEST, detected.dir);
+  EXPECT_EQ_INT (1, detected.protocol);
+  EXPECT_EQ_INT (3, detected.type);
+  EXPECT_EQ_INT (0, detected.target);
+  EXPECT_EQ_INT (FLOW_DIR_REQUEST, req.detect.dir);
+  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, resp.detect.dir);
+  flow_reset (&req);
+  flow_reset (&resp);
+
+  flow_t response_flow;
+  flow_init (&response_flow, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+  CREATE_AND_ATTACH (&response_flow, 1, 7, "900PCI\x04");
+  detected = detect (&response_flow, response_flow.next);
+  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
+  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, response_flow.detect.dir);
+  flow_reset (&response_flow);
+
+  flow_t unknown_flow;
+  flow_init (&unknown_flow, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+  CREATE_AND_ATTACH (&unknown_flow, 1, 5, "Hello");
+  detected = detect (&unknown_flow, unknown_flow.next);
+  EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, detected.dir);
+  EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, unknown_flow.detect.dir);
+  flow_reset (&unknown_flow);
+}
+
+void
+test_flow_detect_forward_target ()
+{
+  printf ("test_flow_detect_forward_target\n");
+
+  flow_t request_flow;
+  flow_init (&request_flow, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+  CREATE_AND_ATTACH (&request_flow, 1, 7, "RCTY1C\x04");
+  flow_detect_t detected = detect (&request_flow, request_flow.next);
+  EXPECT_EQ_INT (0, detected.target);
+  flow_reset (&request_flow);
+
+  flow_t response_flow;
+  flow_init (&response_flow, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+  CREATE_AND_ATTACH (&response_flow, 1, 7, "900PCI\x04");
+  detected = detect (&response_flow, response_flow.next);
+  EXPECT_EQ_INT (0, detected.target);
+  flow_reset (&response_flow);
+
+  flow_t req;
+  flow_t resp;
+  flow_init (&req, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+  flow_init (&resp, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+  flow_link_peer (&req, &resp);
+  CREATE_AND_ATTACH (&req, 1, 7, "RCTY1C\x04");
+  CREATE_AND_ATTACH (&resp, 1, 7, "900PCI\x04");
+  detected = detect (&req, req.next);
+  EXPECT_EQ_INT (FLOW_DIR_REQUEST, detected.dir);
+  EXPECT_EQ_INT (0, detected.target);
+  detected = detect (&resp, resp.next);
+  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
+  EXPECT_EQ_INT (1, detected.target);
+  flow_reset (&req);
+  flow_reset (&resp);
+
+  flow_t unknown_flow;
+  flow_init (&unknown_flow, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+  CREATE_AND_ATTACH (&unknown_flow, 1, 5, "Hello");
+  detected = detect (&unknown_flow, unknown_flow.next);
+  EXPECT_EQ_INT (0, detected.target);
+  flow_reset (&unknown_flow);
 }
 
 #define TEST_CAL(sn, seq, sp_act, op_act, exp, sp_exp, op_exp) \
@@ -612,16 +710,16 @@ test_flow_peer_link_and_reset ()
   EXPECT_EQ_PTR (resp, flow_find_peer (arr, req));
   EXPECT_EQ_PTR (req, flow_find_peer (arr, resp));
 
-  req->dir_role = FLOW_DIR_REQUEST;
+  req->detect.dir = FLOW_DIR_REQUEST;
   flow_link_peer (req, resp);
   EXPECT_EQ_PTR (resp, req->peer);
   EXPECT_EQ_PTR (req, resp->peer);
-  EXPECT_EQ_INT (FLOW_DIR_REQUEST, req->dir_role);
-  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, resp->dir_role);
+  EXPECT_EQ_INT (FLOW_DIR_REQUEST, req->detect.dir);
+  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, resp->detect.dir);
 
   flow_reset (req);
   EXPECT_EQ_PTR (NULL, resp->peer);
-  EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, resp->dir_role);
+  EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, resp->detect.dir);
   flow_reset (resp);
   free (arr);
 }
@@ -664,6 +762,8 @@ main (void)
   test_flow_state_attach_retrans ();
   test_contain ();
   test_detect ();
+  test_flow_detect_dir ();
+  test_flow_detect_forward_target ();
   test_cal ();
   test_flow_handshake ();
   test_flow_syn_resets_existing_tuple ();

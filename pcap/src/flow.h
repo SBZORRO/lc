@@ -20,6 +20,14 @@
 #define FLOW_DIR_REQUEST 1
 #define FLOW_DIR_RESPONSE 2
 
+#define FLOW_REQ_UNKNOWN 0
+#define FLOW_REQ_SERVOS_BASE 1000
+#define FLOW_REQ_DRAGER_BASE 3000
+
+#define FLOW_PROTO_SERVOS 1
+#define FLOW_PROTO_SERVOU 2
+#define FLOW_PROTO_DRAGER 3
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -88,8 +96,9 @@ flow_t *flow_add (flow_arr_t *fa);
 flow_arr_t *flow_arr_init (uint32_t size);
 flow_arr_t *flow_arr_add (flow_arr_t *flow);
 
-int contain (uint8_t *str, uint32_t len, const char **targets);
-int detect (flow_state_t *state);
+uint32_t contain (uint8_t *str, uint32_t len, const char **targets);
+flow_detect_t detect (flow_t *flow, flow_state_t *state);
+bool flow_should_forward_response (flow_t *flow, flow_detect_t response);
 
 /* logger.c */
 void init_logger (FILE *fp, int lvl);

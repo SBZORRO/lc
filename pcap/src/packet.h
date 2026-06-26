@@ -94,7 +94,16 @@ struct sniff_tcp
 
 typedef struct flow_struct flow_t;
 typedef struct flow_state_struct flow_state_t;
+typedef struct flow_detect_struct flow_detect_t;
 typedef struct flow_array_struct flow_arr_t;
+
+struct flow_detect_struct
+{
+  uint8_t dir;       // FLOW_DIR_REQUEST / FLOW_DIR_RESPONSE / UNKNOWN
+  uint32_t protocol; // 1 servos, 2 servou, 3 drager
+  uint32_t type;     // matched target index
+  uint32_t target;   // server[] index if forwardable, else 0
+};
 
 struct flow_state_struct
 {
@@ -112,12 +121,11 @@ struct flow_struct
 {
   flow_state_t *next;    /* Link to next one */
   flow_t *peer;          // the other direction
-  uint8_t dir_role;      // unknown/request/response
+  flow_detect_t detect;  // detect msg type
   struct timespec ts;    // last segment ts
   pthread_t thread;      // thread to process flow
   pthread_mutex_t mutex; // attach/detach mutex
-  // _Atomic int rst_flg;   //
-  uint32_t flags; // tcp flags/thread state
+  uint32_t flags;        // tcp flags/thread state
 #define SENDING 0x8000
   flow_socket_t sock; // fd/socket to send
   FILE *fp;           // Pointer to file storing this flow's data
