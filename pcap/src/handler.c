@@ -12,8 +12,7 @@
 #include "packet.h"
 #include "spsc_queue.h"
 
-flow_arr_t *fa; // flow array
-spsc_queue *pkt_que;
+flow_arr_t *fa;            // flow array
 pthread_mutex_t air_mutex; // flow add/init/reset mutex
 
 /* servos */
@@ -34,22 +33,23 @@ th_send_flow (void *f)
 
       if (state == NULL)
         {
-          if (rst++ > 60)
+          if (++rst <= 60)
             {
-              pthread_mutex_lock (&air_mutex);
-              pthread_mutex_lock (&flow->mutex);
-              state = flow_state_fix_and_pop (flow);
-              pthread_mutex_unlock (&flow->mutex);
-              if (state == NULL && rst++ > 60)
-                {
-                  flow_reset (flow);
-                  log_info ("RST_FLOW: [%p]", flow);
-                }
+              sleep (1);
+              continue;
+            }
+          pthread_mutex_lock (&air_mutex);
+          pthread_mutex_lock (&flow->mutex);
+          state = flow_state_fix_and_pop (flow);
+          pthread_mutex_unlock (&flow->mutex);
+          if (state == NULL)
+            {
+              flow_reset (flow);
+              log_info ("RST_FLOW: [%p]", flow);
               pthread_mutex_unlock (&air_mutex);
               break;
             }
-          sleep (1);
-          continue;
+          pthread_mutex_unlock (&air_mutex);
         }
       rst = 0;
 
@@ -229,6 +229,8 @@ th_dispatch_flow (void *arg)
     }
   pthread_exit (NULL);
 }
+
+spsc_queue *pkt_que;
 
 void
 dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)

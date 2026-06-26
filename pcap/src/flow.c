@@ -146,15 +146,12 @@ flow_init (flow_t *flow,
 }
 
 static void
-flow_reset_state (flow_t *flow, bool clear_tuple)
+flow_clear (flow_t *flow, bool clear_tuple)
 {
   if (clear_tuple && flow->peer != NULL)
     {
       flow->peer->peer = NULL;
-      if (flow->peer->dir_role != FLOW_DIR_UNKNOWN)
-        {
-          flow->peer->dir_role = FLOW_DIR_UNKNOWN;
-        }
+      flow->peer->dir_role = FLOW_DIR_UNKNOWN;
       flow->peer = NULL;
     }
 
@@ -174,10 +171,6 @@ flow_reset_state (flow_t *flow, bool clear_tuple)
       flow->ip_dst.s_addr = 0;
       flow->port_dst = 0;
       flow->filename[0] = '\0'; // make it an empty string
-    }
-  else
-    {
-      flow_filename (flow);
     }
   flow->ip_tar.s_addr = 0;
   flow->port_tar = 0;
@@ -199,7 +192,7 @@ flow_reset_state (flow_t *flow, bool clear_tuple)
 void
 flow_reset (flow_t *flow)
 {
-  flow_reset_state (flow, true);
+  flow_clear (flow, true);
   pthread_mutex_destroy (&flow->mutex);
 }
 
@@ -218,7 +211,7 @@ flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp)
     {
       if (flow->next != NULL || flow->seg_nxt != 0 || flow->sock != FLOW_INVALID_SOCKET)
         {
-          flow_reset_state (flow, false);
+          flow_clear (flow, false);
           thread_bits = flow->flags & THREAD_MASK;
           tcp_bits = 0;
         }
@@ -232,7 +225,7 @@ flow_handshake (flow_t *flow, uint32_t th_flags, uint32_t seq, uint32_t sp)
     }
   else if (th_flags & TH_RST) // receive RST
     {
-      flow_reset_state (flow, false);
+      flow_clear (flow, false);
       tcp_bits = TH_RST; // reset tcp bits
       flow->flags = thread_bits | tcp_bits;
       log_trace ("RST");
