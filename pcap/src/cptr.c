@@ -41,7 +41,7 @@ loop (char *filter_exp)
   pt = pcap_open_live (dev, CPTR_BUF_SIZE, 1, 1000, errbuf);
   // pt = pcap_open_live ("lo", CPTR_BUF_SIZE, 1, 1000, errbuf);
   // pt = pcap_open_live ("rpcap://127.0.0.1:2002/", CPTR_BUF_SIZE, 1, 1000, errbuf);
-  // pt = pcap_open_offline ("../test/si.pcapng", errbuf);
+  // pt = pcap_open_offline ("./test/si.pcapng", errbuf);
   if (pt == NULL)
     {
       fprintf (stderr, "Could't open D %s: \n", errbuf);

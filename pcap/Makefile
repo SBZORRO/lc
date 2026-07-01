@@ -14,7 +14,7 @@ LDFLAGS += -Wl,-rpath,'$$ORIGIN/lib'
 SRCS := $(wildcard $(SRC)/*.c)
 # SRCS := $(shell find . -name '*.c')
 OBJS := $(patsubst $(SRC)/%.c,$(BLD)/%.o,$(SRCS))
-DEPS := $(SRC)/cptr.c $(SRC)/client.c $(SRC)/flow.c $(LOG)/log.c $(SRC)/logger.c $(SRC)/util.c $(SRC)/handler.c
+DEPS := $(SRC)/cptr.c $(SRC)/client.c $(SRC)/flow.c $(SRC)/proto.c $(LOG)/log.c $(SRC)/logger.c $(SRC)/util.c $(SRC)/handler.c
 
 all: $(BLD)/hello
 

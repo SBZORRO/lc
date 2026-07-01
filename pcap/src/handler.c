@@ -69,16 +69,17 @@ th_send_flow (void *f)
       flow->fp = NULL;
       log_trace ("   wrote: [%p][%p][%u][%u]", flow, state, state->seq, sw);
 
+      flow_detect_t res = detect (flow, state);
+      log_debug ("  detect: [%u][%u][%u][%u]", res.dir, res.type, res.target, res.protocol);
+      if (res.target == 0)
+        {
+          flow_state_free (state);
+          continue;
+        }
+      log_info ("DETECTED: [%p][%p][%u][%u][%u][%u]", flow, state, state->seq, res.dir, res.protocol, res.type);
+
       if (flow->sock == FLOW_INVALID_SOCKET)
         {
-          flow_detect_t res = detect (flow, state);
-          if (res.target == 0)
-            {
-              flow_state_free (state);
-              continue;
-            }
-          log_info ("DETECTED: [%p][%p][%u][%u][%u][%u]", flow, state, state->seq, res.dir, res.protocol, res.type);
-
           SET_IP (flow, tar, server[res.target]);
           while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) == FLOW_INVALID_SOCKET)
             {

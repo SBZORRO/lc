@@ -364,7 +364,14 @@ test_flow_state_attach3 ()
   flow_init (ptr, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
 
   CREATE_AND_ATTACH (ptr, 123, 3, "123");
-  CREATE_AND_ATTACH (ptr, 123, 2, "12");
+  flow_state_t *short_dup = flow_state_create (ptr, 123, 0, 0, 2, 0, U8 ("12"));
+  short_dup->pkt = malloc (2);
+  memcpy (short_dup->pkt, "12", 2);
+  flow_state_attach (ptr, short_dup);
+  if (ptr->next != short_dup)
+    {
+      flow_state_free (short_dup);
+    }
   CREATE_AND_ATTACH (ptr, 921034, 7, "1234567");
   CREATE_AND_ATTACH (ptr, 154, 1, " ");
   CREATE_AND_ATTACH (ptr, 154, 3, "123");
@@ -374,8 +381,10 @@ test_flow_state_attach3 ()
   CREATE_AND_ATTACH (ptr, 123, 6, "456789");
   CREATE_AND_ATTACH (ptr, 983, 4, "abcd");
 
-  flow_state_print(ptr);
+  flow_state_print (ptr);
   EXPECT_EQ_INT (6, ptr->size);
+
+  flow_reset (ptr);
 }
 
 const char *test[] = { NULL, "test1", "Hello", "WORLD!", "\x1b", "*2A", NULL };
