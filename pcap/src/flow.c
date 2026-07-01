@@ -492,11 +492,11 @@ flow_state_free (flow_state_t *fs)
 }
 
 /* protocol section */
-const char *servos_requ[] = { "\x1b", "HO", "RCTY1C", "RSEN0A", "RADA", "SDADS", "SDADE", "SDADC", "SDADB", "RSTI1C", "SSMP0202F", "RADC14", NULL };
-const char *servos_requ_filter[] = { "RCTY1C", "RSEN0A", "RADA", NULL };
-const char *servos_resp[] = { "900PCI", "Servo-s0", "Servo-i0", "Servo-s1", "Servo-i1", NULL };
+const char *servos_requ[] = { NULL, "\x1b", "HO", "RCTY1C", "RSEN0A", "RADA", "SDADS", "SDADE", "SDADC", "SDADB", "RSTI1C", "SSMP0202F", "RADC14", NULL };
+const char *servos_requ_filter[] = { NULL, "RCTY1C", "RSEN0A", "RADA", NULL };
+const char *servos_resp[] = { NULL, "900PCI", "Servo-s0", "Servo-i0", "Servo-s1", "Servo-i1", NULL };
 
-const char *servou_resp[] = { "BER2057", "ER2015", "Servo-u0", "Servo-u1", "Servo-n0", "Servo-n1", "Servo-air0", "Servo-air1", NULL };
+const char *servou_resp[] = { NULL, "BER2057", "ER2015", "Servo-u0", "Servo-u1", "Servo-n0", "Servo-n1", "Servo-air0", "Servo-air1", NULL };
 
 const char *default_resp = "*2A";
 
@@ -524,9 +524,10 @@ const char *curve_phase_e = "\x81\x30\x80";
 /*     0161'SmoDragerVent'01.03:06.00 */
 
 // clang-format off
-const char *drager_resp[] = { "\x1BQ", "\x01Q", "\x1BR", "\x01R", "\x01S", "\x01T", "\x01BV", "\x01$", "\x01+", "\x01)", "\x01*", "\x01""0", "\x1B""0", "\x01\x15", "\x01\x01", NULL };
+const char *drager_resp[] = { NULL, "\x1BQ", "\x01Q", "\x1BR", "\x01R", "\x01S", "\x01T", "\x01BV", "\x01$", "\x01+", "\x01)", "\x01*", "\x01""0", "\x1B""0", "\x01\x15", "\x01\x01", NULL };
 // clang-format on
 const char *drager_cmd[] = {
+  NULL,
   /* "\x1b5136430d", */
   /* "\x1b5236440d", */
   /* "\x1b2433460d", */
@@ -561,22 +562,23 @@ contain (uint8_t *str, uint32_t len, const char **targets)
       return 0;
     }
 
-  for (uint32_t i = 0; targets[i] != NULL; i++)
+  /* Index 0 is reserved so returned type IDs match targets[] indexes. */
+  for (uint32_t i = 1; targets[i] != NULL; i++)
     {
       size_t tarlen = strlen (targets[i]);
       int res = memcmp (str, targets[i], MIN (len, tarlen));
       if (res == 0)
         {
-          return i + 1;
+          return i;
         }
     }
 
-  for (uint32_t i = 0; targets[i] != NULL; i++)
+  for (uint32_t i = 1; targets[i] != NULL; i++)
     {
       void *res = memmem (str, len, targets[i], strlen (targets[i]));
       if (res != NULL)
         {
-          return i + 1;
+          return i;
         }
     }
   return 0;
@@ -628,7 +630,6 @@ detect (flow_t *flow, flow_state_t *state)
     {
       return result;
     }
-
   if (flow == NULL)
     {
       flow = state->flow;
@@ -638,56 +639,39 @@ detect (flow_t *flow, flow_state_t *state)
   uint32_t len = state->size_payload;
   uint32_t type = 0;
 
+  if (flow->peer == NULL || flow->peer->detect.dir != FLOW_DIR_REQUEST)
+    {
+      // requ
+      type = contain (payload, len, servos_requ);
+      if (type != 0)
+        {
+          result.protocol = FLOW_PROTO_SERVOS;
+          result.dir = FLOW_DIR_REQUEST;
+          result.type = type;
+          goto done;
+        }
+      type = contain (payload, len, drager_cmd);
+      if (type != 0)
+        {
+          result.protocol = FLOW_PROTO_DRAGER;
+          result.dir = FLOW_DIR_REQUEST;
+          result.type = type;
+          goto done;
+        }
+
+      if (memchr (payload, EOT, len) != NULL)
+        {
+          result.dir = FLOW_DIR_REQUEST;
+          goto done;
+        }
+    }
   // resp
-  type = contain (payload, len, servos_resp);
-  if (type != 0)
+  else if (flow->peer->detect.dir == FLOW_DIR_REQUEST)
     {
-      result.protocol = FLOW_PROTO_SERVOS;
+      result.protocol = flow->peer->detect.protocol;
       result.dir = FLOW_DIR_RESPONSE;
-      result.type = type;
-      result.target = flow_should_forward_response (flow, result) ? FLOW_PROTO_SERVOS : 0;
-      goto done;
-    }
-  type = contain (payload, len, servou_resp);
-  if (type != 0)
-    {
-      result.protocol = FLOW_PROTO_SERVOU;
-      result.dir = FLOW_DIR_RESPONSE;
-      result.type = type;
-      result.target = flow_should_forward_response (flow, result) ? FLOW_PROTO_SERVOU : 0;
-      goto done;
-    }
-  type = contain (payload, len, drager_resp);
-  if (type != 0)
-    {
-      result.protocol = FLOW_PROTO_DRAGER;
-      result.dir = FLOW_DIR_RESPONSE;
-      result.type = type;
-      result.target = flow_should_forward_response (flow, result) ? FLOW_PROTO_DRAGER : 0;
-      goto done;
-    }
-
-  // requ
-  type = contain (payload, len, servos_requ);
-  if (type != 0)
-    {
-      result.protocol = FLOW_PROTO_SERVOS;
-      result.dir = FLOW_DIR_REQUEST;
-      result.type = type;
-      goto done;
-    }
-  type = contain (payload, len, drager_cmd);
-  if (type != 0)
-    {
-      result.protocol = FLOW_PROTO_DRAGER;
-      result.dir = FLOW_DIR_REQUEST;
-      result.type = type;
-      goto done;
-    }
-
-  if (memchr (payload, EOT, len) != NULL)
-    {
-      result.dir = FLOW_DIR_REQUEST;
+      result.type = flow->peer->detect.type;
+      result.target = flow_should_forward_response (flow, result) ? result.protocol : 0;
       goto done;
     }
 

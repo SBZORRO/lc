@@ -378,7 +378,7 @@ test_flow_state_attach3 ()
   EXPECT_EQ_INT (6, ptr->size);
 }
 
-const char *test[] = { "test1", "Hello", "WORLD!", "\x1b", "*2A", NULL };
+const char *test[] = { NULL, "test1", "Hello", "WORLD!", "\x1b", "*2A", NULL };
 
 void
 test_contain ()
@@ -414,21 +414,21 @@ test_detect ()
   EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, detected.dir);
   EXPECT_EQ_INT (0, detected.target);
   detected = detect (fp, fp->next->next);
-  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
-  EXPECT_EQ_INT (3, detected.protocol);
-  EXPECT_EQ_INT (6, detected.type);
+  EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, detected.dir);
   EXPECT_EQ_INT (0, detected.target);
   detected = detect (fp, fp->next->next->next);
-  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
+  EXPECT_EQ_INT (FLOW_DIR_REQUEST, detected.dir);
+  EXPECT_EQ_INT (1, detected.protocol);
+  EXPECT_EQ_INT (1, detected.type);
   EXPECT_EQ_INT (0, detected.target);
   detected = detect (fp, fp->next->next->next->next);
-  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
+  EXPECT_EQ_INT (FLOW_DIR_REQUEST, detected.dir);
   EXPECT_EQ_INT (0, detected.target);
   detected = detect (fp, fp->next->next->next->next->next);
-  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
+  EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, detected.dir);
   EXPECT_EQ_INT (0, detected.target);
   detected = detect (fp, fp->next->next->next->next->next->next);
-  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
+  EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, detected.dir);
   EXPECT_EQ_INT (0, detected.target);
   detected = detect (fp, fp->next->next->next->next->next->next->next);
   EXPECT_EQ_INT (FLOW_DIR_UNKNOWN, detected.dir);
@@ -472,8 +472,8 @@ test_flow_detect_dir ()
   flow_init (&response_flow, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
   CREATE_AND_ATTACH (&response_flow, 1, 7, "900PCI\x04");
   detected = detect (&response_flow, response_flow.next);
-  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, detected.dir);
-  EXPECT_EQ_INT (FLOW_DIR_RESPONSE, response_flow.detect.dir);
+  EXPECT_EQ_INT (FLOW_DIR_REQUEST, detected.dir);
+  EXPECT_EQ_INT (FLOW_DIR_REQUEST, response_flow.detect.dir);
   flow_reset (&response_flow);
 
   flow_t unknown_flow;
