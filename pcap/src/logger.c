@@ -4,24 +4,24 @@
 #include "log.c/log.h"
 
 pthread_mutex_t MUTEX_LOG;
-void log_lock (bool lock, void *udata);
+void logger_lock (bool lock, void *udata);
 
-void
-init_logger (FILE *fp, int lvl)
+int
+logger_init (FILE *fp, int lvl)
 {
   log_set_level (lvl);
   log_set_quiet (0);
 
-  init_logger_lock ();
+  logger_lock_init ();
 
-  int id = log_add_fp (fp, lvl);
+  return log_add_fp (fp, lvl);
 }
 
 int
-init_logger_lock ()
+logger_lock_init ()
 {
   pthread_mutex_init (&MUTEX_LOG, NULL);
-  log_set_lock (log_lock, &MUTEX_LOG);
+  log_set_lock (logger_lock, &MUTEX_LOG);
 
   /* Insert threaded application code here... */
 
@@ -31,7 +31,7 @@ init_logger_lock ()
 }
 
 void
-log_lock (bool lock, void *udata)
+logger_lock (bool lock, void *udata)
 {
   pthread_mutex_t *LOCK = (pthread_mutex_t *) (udata);
   if (lock)

@@ -108,6 +108,25 @@ log_level_string (int level)
   return level_strings[level];
 }
 
+bool
+log_level_enabled (int level)
+{
+  if (!L.quiet && level >= L.level)
+    {
+      return true;
+    }
+
+  for (int i = 0; i < MAX_CALLBACKS && L.callbacks[i].fn; i++)
+    {
+      if (level >= L.callbacks[i].level)
+        {
+          return true;
+        }
+    }
+
+  return false;
+}
+
 void
 log_set_lock (log_LockFn fn, void *udata)
 {

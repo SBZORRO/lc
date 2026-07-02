@@ -157,9 +157,9 @@ th_dispatch_flow (void *arg)
       offset_payload = SIZE_ETHERNET + size_ip + size_tcp;
       payload = (u_char *) (p + offset_payload);
 
-      log_info ("DEQUEUED: [%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d][%u][%u][%u][%u][%u]", filename (ip->ip_src, tcp->th_sport, ip->ip_dst, tcp->th_dport), seq, ack, flags, offset_payload, size_payload);
-      log_hex (LOG_INFO, "HPAYLOAD: %s", payload, size_payload);
-      log_info ("APAYLOAD: %.*s", size_payload, payload);
+      log_trace ("DEQUEUED: [%03d.%03d.%03d.%03d.%05d-%03d.%03d.%03d.%03d.%05d][%u][%u][%u][%u][%u]", filename (ip->ip_src, tcp->th_sport, ip->ip_dst, tcp->th_dport), seq, ack, flags, offset_payload, size_payload);
+      log_hex (LOG_TRACE, "HPAYLOAD: %s", payload, size_payload);
+      log_trace ("APAYLOAD: %.*s", size_payload, payload);
 
       /*
        * lock
@@ -231,9 +231,9 @@ dl_ethernet (u_char *user, const struct pcap_pkthdr *h, const u_char *p)
   uint8_t *pkt = MALLOC (uint8_t, h->caplen);
   memcpy (pkt, p, h->caplen);
 
-  log_info ("  pkthdr: [%ld.%06ld][%u][%u]",
-            (long) h->ts.tv_sec, (long) h->ts.tv_usec, h->caplen, h->len);
-  log_hex (LOG_INFO, "  pktbdy: %s", pkt, h->caplen);
+  log_trace ("  pkthdr: [%ld.%06ld][%u][%u]",
+             (long) h->ts.tv_sec, (long) h->ts.tv_usec, h->caplen, h->len);
+  log_hex (LOG_TRACE, "  pktbdy: %s", pkt, h->caplen);
 
   if (!spsc_enqueue (pkt_que, pkt))
     {

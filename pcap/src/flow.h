@@ -101,9 +101,9 @@ flow_detect_t detect (flow_t *flow, flow_state_t *state);
 bool flow_should_forward_response (flow_t *flow, flow_detect_t response);
 
 /* logger.c */
-void init_logger (FILE *fp, int lvl);
-int init_logger_lock ();
-void log_lock (bool lock, void *udata);
+int logger_init (FILE *fp, int lvl);
+int logger_lock_init ();
+void logger_lock (bool lock, void *udata);
 void logger_destory ();
 
 /* util.c */

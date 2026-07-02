@@ -1,5 +1,7 @@
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include "flow.h"
 #include "log.c/log.h"
@@ -14,16 +16,63 @@ extern pthread_mutex_t air_mutex; // flow add/init/reset mutex
 /* 4001-4008 */
 /* dst host 10.160.16.157 and tcp dst portrange 4001-4008 */
 char *filter_exp = "tcp"; /* The filter expression */
+char *log_dir = ".";
+int log_level = LOG_INFO;
+
+static const char *
+parse_arg_value (const char *arg, const char *prefix)
+{
+  size_t prefix_len = strlen (prefix);
+
+  if (strncmp (arg, prefix, prefix_len) != 0)
+    return NULL;
+
+  return arg + prefix_len;
+}
+
+static int
+parse_arg_log_level (const char *value, int fallback)
+{
+  int lvl = value[0] - '0';
+  if (lvl < LOG_TRACE || lvl > LOG_FATAL)
+    return fallback;
+  return lvl;
+}
 
 // handler -> ring -> th_dispatch_flow -> flow -> th_send_flow
 int
 main (int argc, char *argv[])
 {
-  /* init logger */
-  FILE *fp;
-  fp = fopen ("./log.txt", "ab");
+  /* parse args */
+  for (int i = 1; i < argc; i++)
+    {
+      const char *arg_filter = parse_arg_value (argv[i], "--pcapFilter=");
+      const char *arg_log_dir = parse_arg_value (argv[i], "--logDir=");
+      const char *arg_log_lvl = parse_arg_value (argv[i], "--logLevel=");
+
+      if (arg_log_lvl != NULL)
+        {
+          log_level = parse_arg_log_level (arg_log_lvl, log_level);
+          continue;
+        }
+      if (arg_filter != NULL)
+        {
+          filter_exp = (char *) arg_filter;
+          continue;
+        }
+      if (arg_log_dir != NULL)
+        {
+          log_dir = (char *) arg_log_dir;
+          continue;
+        }
+    }
+
+  char log_path[4096];
+  snprintf (log_path, sizeof log_path, "%s/%s", log_dir, "log.txt");
+  FILE *fp = fopen (log_path, "ab");
   if (fp == NULL)
     {
+      fprintf (stderr, "failed to open log file: %s\n", log_path);
       return -1;
     }
   if (flow_net_init () != 0)
@@ -31,8 +80,11 @@ main (int argc, char *argv[])
       fclose (fp);
       return -1;
     }
-  init_logger (fp, LOG_DEBUG);
+
+  logger_init (fp, log_level);
   log_info ("Hello World!");
+  log_info ("log_level: %s", log_level_string (log_level));
+  log_info ("log_path: %s", log_path);
 
   pkt_que = spsc_init (PKT_QUE_CAP);
   log_info ("pkt_que: %p", pkt_que);
@@ -51,8 +103,6 @@ main (int argc, char *argv[])
   pthread_create (&tht_dispatch_flow, NULL, th_dispatch_flow, (void *) pkt_que);
   log_info ("tht_dispatch_flow: %u", tht_dispatch_flow);
 
-  // block
-  filter_exp = argv[1] == NULL ? filter_exp : argv[1];
   log_info ("filter_exp: %s", filter_exp);
   loop (filter_exp);
 
