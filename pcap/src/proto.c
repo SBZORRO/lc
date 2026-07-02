@@ -1,8 +1,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include "src/flow.h"
-#include "src/packet.h"
+#include "flow.h"
+#include "packet.h"
 
 /* protocol section */
 const char *servos_requ[] = { NULL, "\x1b", "HO", "RCTY1C", "RSEN0A", "RADA", "SDADS", "SDADE", "SDADC", "SDADB", "RSTI1C", "SSMP0202F", "RADC14", NULL };

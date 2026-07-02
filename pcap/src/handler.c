@@ -1,4 +1,3 @@
-#include <netinet/in.h>
 #include <pcap/pcap.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -101,6 +100,7 @@ th_send_flow (void *f)
     }
 
   pthread_exit (NULL);
+  return NULL;
 }
 
 void *
@@ -218,6 +218,7 @@ th_dispatch_flow (void *arg)
        */
     }
   pthread_exit (NULL);
+  return NULL;
 }
 
 spsc_queue *pkt_que;
