@@ -1,5 +1,3 @@
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -377,15 +375,23 @@ test_detect ()
   printf ("test_detect\n");
 
   flow_t flow;
-  flow_t *ptr = &flow;
-  flow_init (ptr, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
+  flow_t *fp = &flow;
+  flow_init (fp, (struct in_addr) { 0 }, (struct in_addr) { 0 }, 0, 0);
 
-  CREATE_AND_ATTACH (ptr, 34, 5, "test1");
-  CREATE_AND_ATTACH (ptr, 5, 5, "Hello");
-  CREATE_AND_ATTACH (ptr, 77, 1, "\x1b");
-  CREATE_AND_ATTACH (ptr, 9487, 3, "*2A");
-  CREATE_AND_ATTACH (ptr, 372, 21, "asdf\x04lasWORLD!adfasd\x04");
-  EXPECT_EQ_INT (detect (ptr), 3);
+  CREATE_AND_ATTACH (fp, 34, 2, "\x01T");
+  CREATE_AND_ATTACH (fp, 5, 5, "Hello");
+  CREATE_AND_ATTACH (fp, 77, 1, "\x1b");
+  CREATE_AND_ATTACH (fp, 9487, 3, "*2A");
+  CREATE_AND_ATTACH (fp, 6666, 8, "Servo-u0");
+  CREATE_AND_ATTACH (fp, 3333, 3, "Servo-u0");
+  CREATE_AND_ATTACH (fp, 372, 21, "asdf\x04lasWORLD!900PCI\x04");
+  EXPECT_EQ_INT (detect (fp->next), 0);
+  EXPECT_EQ_INT (detect (fp->next->next), 3);
+  EXPECT_EQ_INT (detect (fp->next->next->next), 3);
+  EXPECT_EQ_INT (detect (fp->next->next->next->next), 1);
+  EXPECT_EQ_INT (detect (fp->next->next->next->next->next), 1);
+  EXPECT_EQ_INT (detect (fp->next->next->next->next->next->next), 2);
+  EXPECT_EQ_INT (detect (fp->next->next->next->next->next->next->next), 0);
 
   /* CREATE_AND_ATTACH (ptr + 1, 77, 8, "BER2057\x04"); */
   /* EXPECT_EQ_INT (detect (ptr + 1), 2); */
@@ -396,7 +402,7 @@ test_detect ()
   /* CREATE_AND_ATTACH (ptr + 3, 327, 9, "Servo-u0\x04"); */
   /* EXPECT_EQ_INT (detect (ptr + 3), 2); */
 
-  flow_reset (ptr);
+  flow_reset (fp);
 }
 
 #define TEST_CAL(sn, seq, sp_act, op_act, exp, sp_exp, op_exp) \

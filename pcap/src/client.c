@@ -1,27 +1,27 @@
-#include <arpa/inet.h>
-#include <asm-generic/errno-base.h>
-#include <asm-generic/errno.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include "flow.h"
-#include "src/log.c/log.h"
-#include "src/packet.h"
+#include "log.c/log.h"
+#include "packet.h"
 
 void
 do_sent (flow_t *flow, char *msg, size_t len)
 {
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
   /* TODO half send */
   while (send (flow->sock, msg, len, MSG_NOSIGNAL) < 0)
     {
       perror ("Send Fail");
+#ifdef _WIN32
+errno = WSAGetLastError();
+#endif
       log_error ("SEND_ERR: [%d][%p]", errno, flow);
       if (errno == EPIPE || errno == ECONNRESET || errno == ENOTCONN)
         {
@@ -78,20 +78,20 @@ do_connect (struct in_addr ip, u_short port)
 }
 
 /* Set the specified socket in non-blocking mode, with no delay flag. */
-int
-socketSetNonBlockNoDelay (int fd)
-{
-  int flags, yes = 1;
+/* int */
+/* socketSetNonBlockNoDelay (int fd) */
+/* { */
+/*   int flags, yes = 1; */
 
-  /* Set the socket nonblocking.
-   * Note that fcntl(2) for F_GETFL and F_SETFL can't be
-   * interrupted by a signal. */
-  if ((flags = fcntl (fd, F_GETFL)) == -1)
-    return -1;
-  if (fcntl (fd, F_SETFL, flags | O_NONBLOCK) == -1)
-    return -1;
+/*   /\* Set the socket nonblocking. */
+/*    * Note that fcntl(2) for F_GETFL and F_SETFL can't be */
+/*    * interrupted by a signal. *\/ */
+/*   if ((flags = fcntl (fd, F_GETFL)) == -1) */
+/*     return -1; */
+/*   if (fcntl (fd, F_SETFL, flags | O_NONBLOCK) == -1) */
+/*     return -1; */
 
-  /* This is best-effort. No need to check for errors. */
-  setsockopt (fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof (yes));
-  return 0;
-}
+/*   /\* This is best-effort. No need to check for errors. *\/ */
+/*   setsockopt (fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof (yes)); */
+/*   return 0; */
+/* } */

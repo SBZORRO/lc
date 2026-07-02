@@ -1,7 +1,4 @@
 #include "flow.h"
-#include <arpa/inet.h>
-#include <bits/time.h>
-#include <netinet/in.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -10,8 +7,8 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include "src/log.c/log.h"
-#include "src/packet.h"
+#include "log.c/log.h"
+#include "packet.h"
 
 flow_arr_t *
 flow_arr_init (uint32_t size)
@@ -477,7 +474,6 @@ contain (uint8_t *str, uint32_t len, const char **targets)
           return 1;
         }
     }
-
   // contain
   for (int i = 0; targets[i] != NULL; i++)
     {
@@ -511,3 +507,4 @@ detect (flow_state_t *ptr)
     }
   return 0;
 }
+

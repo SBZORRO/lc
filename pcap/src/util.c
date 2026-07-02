@@ -7,8 +7,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "flow.h"
-#include "src/log.c/log.h"
-#include "src/packet.h"
+#include "log.c/log.h"
+#include "packet.h"
 
 void *
 check_malloc (size_t size)

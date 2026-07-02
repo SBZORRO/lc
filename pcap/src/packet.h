@@ -1,11 +1,20 @@
 #pragma once
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#else
+#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
+#endif
 #include <pcap/pcap.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <time.h>
+#include <pthread.h>
 
 /* ethernet headers are always exactly 14 bytes */
 #define SIZE_ETHERNET 14

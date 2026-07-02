@@ -1,5 +1,3 @@
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <pcap/pcap.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -38,9 +36,9 @@ loop (char *filter_exp)
       net = 0;
       mask = 0;
     }
-  // pt = pcap_open_live (dev, bufsize, 1, 1000, errbuf);
+  pt = pcap_open_live (dev, bufsize, 1, 1000, errbuf);
   // pt = pcap_open_live ("lo", bufsize, 1, 1000, errbuf);
-  pt = pcap_open_offline ("../test/si.pcapng", errbuf);
+  // pt = pcap_open_offline ("../test/si.pcapng", errbuf);
 
   if (pt == NULL)
     {

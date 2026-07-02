@@ -1,13 +1,11 @@
 #define _GNU_SOURCE
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <pcap/pcap.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/select.h>
+// #include <sys/select.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
@@ -19,17 +17,15 @@
 /* 10.160.16.157 */
 /* 4001-4008 */
 /* dst host 10.160.16.157 and tcp dst portrange 4001-4008 */
-/* char filter_exp[] = "dst port 9998"; /\* The filter expression *\/ */
-extern char *filter_exp; // pcap filter exp
+char *filter_exp = "dst port 4003"; /* The filter expression */
 
 flow_arr_t *fa; // flow array
-#define FLOW_PTR_CAP 255
+#define FLOW_PTR_CAP 1024
 
-char *filter_exp = "dst port 9998"; /* The filter expression */
 
 spsc_queue *pkt_que;
 // 2^n
-#define PKT_QUE_CAP 65536
+#define PKT_QUE_CAP 209715200 // 200m
 
 /* servos */
 /* servou */
