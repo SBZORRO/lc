@@ -5,13 +5,14 @@
 #include "packet.h"
 
 /* protocol section */
+// const char *servos_resp[] = { NULL, "900PCI", "Servo-s0", "Servo-i0", "Servo-s1", "Servo-i1", NULL };
+// const char *servou_resp[] = { NULL, "BER2057", "ER2015", "Servo-u0", "Servo-u1", "Servo-n0", "Servo-n1", "Servo-air0", "Servo-air1", NULL };
 const char *servos_requ[] = { NULL, "\x1b", "HO", "RCTY1C", "RSEN0A", "RADA", "SDADS", "SDADE", "SDADC", "SDADB", "RSTI1C", "SSMP0202F", "RADC14", NULL };
-const char *servos_requ_filter[] = { NULL, "RCTY1C", "RSEN0A", "RADA", NULL };
-const char *servos_resp[] = { NULL, "900PCI", "Servo-s0", "Servo-i0", "Servo-s1", "Servo-i1", NULL };
-
-const char *servou_resp[] = { NULL, "BER2057", "ER2015", "Servo-u0", "Servo-u1", "Servo-n0", "Servo-n1", "Servo-air0", "Servo-air1", NULL };
+const char *servos_resp[] = { NULL, "Servo-s0", "Servo-i0", "Servo-s1", "Servo-i1", NULL };
+const char *servou_resp[] = { NULL, "Servo-u0", "Servo-u1", "Servo-n0", "Servo-n1", "Servo-air0", "Servo-air1", NULL };
 
 const char *default_resp = "*2A";
+const char *RCTY = "RCTY1C";
 
 const int EOT = '\x04';
 const int ESC = '\x1b';
@@ -57,14 +58,36 @@ const char *drager_cmd[] = {
   NULL
 };
 
-static uint8_t
-flow_dir_opposite (uint8_t role)
+static uint32_t
+flow_dir_opposite (uint32_t role)
 {
   if (role == FLOW_DIR_REQUEST)
     return FLOW_DIR_RESPONSE;
   if (role == FLOW_DIR_RESPONSE)
     return FLOW_DIR_REQUEST;
   return FLOW_DIR_UNKNOWN;
+}
+
+bool
+flow_should_forward_response (flow_detect_t result)
+{
+  switch (result.protocol)
+    {
+    case FLOW_PROTO_SERVOU:
+    case FLOW_PROTO_SERVOS:
+      switch (result.type)
+        {
+        case 3:
+        case 4:
+        case 5:
+          return true;
+        default:
+          return false;
+        }
+    case FLOW_PROTO_DRAGER:
+    default:
+      return false;
+    }
 }
 
 uint32_t
@@ -97,105 +120,70 @@ contain (uint8_t *str, uint32_t len, const char **targets)
   return 0;
 }
 
-bool
-flow_should_forward_response (flow_t *flow, flow_detect_t response)
-{
-  if (flow == NULL || flow->peer == NULL || response.dir != FLOW_DIR_RESPONSE)
-    {
-      return false;
-    }
-
-  flow_detect_t request = flow->peer->detect;
-  if (request.dir != FLOW_DIR_REQUEST || request.protocol == 0 || request.type == 0)
-    {
-      return false;
-    }
-
-  /*
-   * Request filter policy. Narrow this switch to the exact request message
-   * types whose responses should be forwarded.
-   */
-  switch (request.protocol)
-    {
-    case FLOW_PROTO_SERVOS:
-      switch (request.type)
-        {
-        case 3:
-        case 4:
-        case 5:
-          return true;
-        default:
-          return false;
-        }
-    case FLOW_PROTO_DRAGER:
-      return response.protocol == request.protocol;
-    default:
-      return false;
-    }
-}
-
 flow_detect_t
 detect (flow_t *flow, flow_state_t *state)
 {
   flow_detect_t result = { 0 };
 
-  if (state == NULL || state->pkt == NULL || state->size_payload == 0)
+  if (flow->detect.dir != 0 && flow->detect.protocol != 0 && flow->detect.type != 0 && flow->detect.target != 0)
     {
-      return result;
-    }
-  if (flow == NULL)
-    {
-      flow = state->flow;
+      return flow->detect;
     }
 
   uint8_t *payload = state->pkt + state->offset_payload;
   uint32_t len = state->size_payload;
   uint32_t type = 0;
 
-  if (flow->peer == NULL || flow->peer->detect.dir != FLOW_DIR_REQUEST)
+  type = contain (payload, len, servos_requ);
+  if (type != 0)
     {
-      // requ
-      type = contain (payload, len, servos_requ);
+      result.dir = FLOW_DIR_REQUEST;
+      result.type = type;
+      goto done;
+    }
+  if (flow->peer != NULL && flow->peer->detect.dir == FLOW_DIR_REQUEST)
+    {
+      type = contain (payload, len, servos_resp);
       if (type != 0)
         {
           result.protocol = FLOW_PROTO_SERVOS;
-          result.dir = FLOW_DIR_REQUEST;
-          result.type = type;
+          result.dir = FLOW_DIR_RESPONSE;
+          result.type = flow->peer->detect.type;
+          result.target = flow_should_forward_response (result) ? result.protocol : 0;
           goto done;
         }
-      type = contain (payload, len, drager_cmd);
+      type = contain (payload, len, servou_resp);
       if (type != 0)
         {
-          result.protocol = FLOW_PROTO_DRAGER;
-          result.dir = FLOW_DIR_REQUEST;
-          result.type = type;
-          goto done;
-        }
-
-      if (memchr (payload, EOT, len) != NULL)
-        {
-          result.dir = FLOW_DIR_REQUEST;
+          result.protocol = FLOW_PROTO_SERVOU;
+          result.dir = FLOW_DIR_RESPONSE;
+          result.type = flow->peer->detect.type;
+          result.target = flow_should_forward_response (result) ? result.protocol : 0;
           goto done;
         }
     }
-  // resp
-  else if (flow->peer->detect.dir == FLOW_DIR_REQUEST)
+  type = contain (payload, len, drager_cmd);
+  if (type != 0)
     {
-      result.protocol = flow->peer->detect.protocol;
-      result.dir = FLOW_DIR_RESPONSE;
-      result.type = flow->peer->detect.type;
-      result.target = flow_should_forward_response (flow, result) ? result.protocol : 0;
+      result.protocol = FLOW_PROTO_DRAGER;
+      result.dir = FLOW_DIR_REQUEST;
+      result.type = type;
+      goto done;
+    }
+
+  if (memchr (payload, EOT, len) != NULL)
+    {
+      result.dir = FLOW_DIR_REQUEST;
       goto done;
     }
 
 done:
-  if (flow != NULL)
+  flow->detect = result;
+  if (result.dir != FLOW_DIR_UNKNOWN && flow->peer != NULL)
     {
-      flow->detect = result;
-      if (result.dir != FLOW_DIR_UNKNOWN && flow->peer != NULL)
-        {
-          flow->peer->detect.dir = flow_dir_opposite (result.dir);
-        }
+      flow->peer->detect.dir = flow_dir_opposite (result.dir);
+      flow->peer->detect.protocol = result.protocol;
+      flow->peer->detect.type = result.type;
     }
   return result;
 }

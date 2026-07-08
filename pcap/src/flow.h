@@ -24,6 +24,7 @@
 #define FLOW_REQ_SERVOS_BASE 1000
 #define FLOW_REQ_DRAGER_BASE 3000
 
+#define FLOW_PROTO_UNKNOWN 0
 #define FLOW_PROTO_SERVOS 1
 #define FLOW_PROTO_SERVOU 2
 #define FLOW_PROTO_DRAGER 3
@@ -98,7 +99,7 @@ flow_arr_t *flow_arr_add (flow_arr_t *flow);
 
 uint32_t contain (uint8_t *str, uint32_t len, const char **targets);
 flow_detect_t detect (flow_t *flow, flow_state_t *state);
-bool flow_should_forward_response (flow_t *flow, flow_detect_t response);
+bool flow_should_forward_response (flow_detect_t result);
 
 /* logger.c */
 int logger_init (FILE *fp, int lvl);

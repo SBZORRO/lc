@@ -99,8 +99,8 @@ typedef struct flow_array_struct flow_arr_t;
 
 struct flow_detect_struct
 {
-  uint8_t dir;       // FLOW_DIR_REQUEST / FLOW_DIR_RESPONSE / UNKNOWN
-  uint32_t protocol; // 1 servos, 2 servou, 3 drager
+  uint32_t protocol; // 0 unknown, 1 servos, 2 servou, 3 drager
+  uint32_t dir;      // 0 UNKNOWN, 1 FLOW_DIR_REQUEST, 2 FLOW_DIR_RESPONSE
   uint32_t type;     // matched target index
   uint32_t target;   // server[] index if forwardable, else 0
 };
