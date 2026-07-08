@@ -10,6 +10,12 @@
 #include "packet.h"
 
 #ifdef _WIN32
+typedef int flow_io_result_t;
+#else
+typedef ssize_t flow_io_result_t;
+#endif
+
+#ifdef _WIN32
 static int winsock_initialized = 0;
 
 int
@@ -56,8 +62,9 @@ flow_socket_close (flow_socket_t sock)
 static int
 flow_should_reconnect (int err)
 {
-  return err == WSAECONNRESET || err == WSAENOTCONN || err == WSAESHUTDOWN;
+  return err == WSAECONNRESET || err == WSAENOTCONN || err == WSAESHUTDOWN || err == WSAECONNABORTED;
 }
+
 #else
 int
 flow_net_init (void)
@@ -85,9 +92,25 @@ flow_socket_close (flow_socket_t sock)
 static int
 flow_should_reconnect (int err)
 {
-  return err == EPIPE || err == ECONNRESET || err == ENOTCONN;
+  return err == EPIPE || err == ECONNRESET || err == ENOTCONN || err == ECONNABORTED;
 }
+
 #endif
+
+static int
+flow_reconnect (flow_t *flow)
+{
+  flow_close_socket (flow);
+  flow->sock = do_connect (flow->ip_tar, flow->port_tar);
+  if (flow->sock == FLOW_INVALID_SOCKET)
+    {
+      log_warn ("FAILED_RECONNECTING: [%p][%llu]", flow, (unsigned long long) flow->sock);
+      return -1;
+    }
+
+  log_info ("RECONNECTED: [%p][%llu]", flow, (unsigned long long) flow->sock);
+  return 0;
+}
 
 void
 flow_close_socket (flow_t *flow)
@@ -108,25 +131,36 @@ do_sent (flow_t *flow, char *msg, size_t len)
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
 #endif
-  /* TODO half send */
-  while (send (flow->sock, msg, len, MSG_NOSIGNAL) < 0)
+  size_t sent = 0;
+
+  while (sent < len)
     {
+      flow_io_result_t n;
+
+      n = send (flow->sock, msg + sent, len - sent, MSG_NOSIGNAL);
+      if (n > 0)
+        {
+          sent += (size_t) n;
+          continue;
+        }
+
+      if (n == 0)
+        {
+          log_warn ("SEND_ZERO: [%p][%llu]", flow, (unsigned long long) flow->sock);
+          if (flow_reconnect (flow) == 0)
+            continue;
+          return;
+        }
+
       perror ("Send Fail");
       int err = flow_socket_errno ();
       errno = err;
       log_error ("SEND_ERR: [%p][%d]", flow, err);
-      if (flow_should_reconnect (err))
-        {
-          flow_close_socket (flow);
-          while ((flow->sock = do_connect (flow->ip_tar, flow->port_tar)) == FLOW_INVALID_SOCKET)
-            {
-              log_warn ("FAILED_RECONNECTING: [%p][%llu]", flow,
-                        (unsigned long long) flow->sock);
-              break;
-              // sleep (1);
-            }
-        }
-      break;
+      if (!flow_should_reconnect (err))
+        return;
+
+      if (flow_reconnect (flow) != 0)
+        return;
     }
 }
 
@@ -178,7 +212,6 @@ do_connect (struct in_addr ip, u_short port)
 
   return sock;
 }
-
 /* Set the specified socket in non-blocking mode, with no delay flag. */
 /* int */
 /* socketSetNonBlockNoDelay (int fd) */
